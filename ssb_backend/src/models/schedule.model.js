@@ -47,8 +47,32 @@ async function createBulkSchedule({ route_id, bus_id, driver_id, start_date, end
 
     return result.affectedRows; // Trả về số lượng lịch đã tạo
 }
+// 3. Lấy lịch trình riêng của một Tài xế
+async function getSchedulesByDriverId(driverId) {
+    const sql = `
+        SELECT 
+            s.schedule_id, 
+            s.date, 
+            s.start_time, 
+            s.status,
+            r.route_name, 
+            r.start_point, 
+            r.end_point,
+            b.license_plate,
+            b.brand
+        FROM schedules s
+        JOIN routes r ON s.route_id = r.route_id
+        JOIN buses b ON s.bus_id = b.bus_id
+        WHERE s.driver_id = ? 
+        ORDER BY s.date DESC, s.start_time ASC
+    `;
+    
+    const [rows] = await pool.query(sql, [driverId]);
+    return rows;
+}
 
 module.exports = {
     getAllSchedules,
-    createBulkSchedule
+    createBulkSchedule,
+    getSchedulesByDriverId
 };

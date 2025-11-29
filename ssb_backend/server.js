@@ -36,6 +36,10 @@ app.use((req, res, next) => {
 const authRoutes = require("./src/routes/auth.routes");
 const scheduleRoutes = require("./src/routes/schedule.routes");
 const trackingRoutes = require("./src/routes/tracking.routes");
+const notiRoutes = require("./src/routes/notification.routes");
+const studentRoutes = require("./src/routes/student.routes"); 
+const routeRoutes = require("./src/routes/route.routes");
+const busRoutes = require("./src/routes/bus.routes");
 
 app.get("/", (req, res) => res.send("SSB Backend Server is running..."));
 
@@ -43,6 +47,10 @@ app.get("/", (req, res) => res.send("SSB Backend Server is running..."));
 app.use("/api/auth", authRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/tracking", trackingRoutes);
+app.use("/api/notifications", notiRoutes);
+app.use("/api/students", studentRoutes);
+app.use("/api/routes", routeRoutes);
+app.use("/api/buses", busRoutes);
 
 // =======================================================
 // 5. SERVER START

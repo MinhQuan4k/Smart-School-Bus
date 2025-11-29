@@ -27,9 +27,25 @@ async function findUserById(id) {
     );
     return rows[0];
 }
+// 4. Lấy danh sách user theo role
+async function getUsersByRole(role) {
+    const [rows] = await pool.query(
+        "SELECT user_id, full_name, phone, address FROM users WHERE role = ? ORDER BY user_id DESC", 
+        [role]
+    );
+    return rows;
+}
+
+// 5. Xóa user
+async function deleteUser(id) {
+    const [result] = await pool.query("DELETE FROM users WHERE user_id = ?", [id]);
+    return result.affectedRows;
+}
 
 module.exports = {
     findUserByPhone,
     createUser,
-    findUserById
+    findUserById,
+    getUsersByRole, 
+    deleteUser
 };

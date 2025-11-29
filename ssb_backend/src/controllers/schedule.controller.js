@@ -30,3 +30,18 @@ exports.create = async (req, res, next) => {
         next(err);
     }
 };
+// API: Tài xế xem lịch của chính mình
+exports.getMySchedules = async (req, res, next) => {
+    try {
+        // req.user được tạo ra từ middleware verifyToken
+        const driverId = req.user.id; 
+
+        console.log(">> Tài xế đang xem lịch, ID:", driverId);
+
+        const data = await scheduleModel.getSchedulesByDriverId(driverId);
+        
+        res.json({ success: true, data });
+    } catch (err) {
+        next(err);
+    }
+};

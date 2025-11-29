@@ -8,4 +8,5 @@ router.get("/", scheduleController.list);
 // POST /api/schedules (Tạo lịch)
 router.post("/", scheduleController.create);
 router.post("/", verifyToken, isAdmin, scheduleController.create);
+router.get("/driver/me", verifyToken, scheduleController.getMySchedules);
 module.exports = router;
