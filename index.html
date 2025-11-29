@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SSB Tracking & Attendance Test</title>
+    <!-- Thư viện Bản đồ Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Thư viện Socket Client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; gap: 20px; padding: 20px; background-color: #f4f4f9; }
+        .box { 
+            background: white; 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            width: 45%; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 { margin-top: 0; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* Chỉnh kích thước bản đồ */
+        #map { height: 350px; width: 100%; border-radius: 8px; margin-top: 15px; border: 1px solid #ccc;}
+        
+        /* Khu vực log thông báo */
+        #logs { 
+            height: 150px; 
+            overflow-y: auto; 
+            background: #fff3cd; 
+            border: 1px solid #ffeeba; 
+            padding: 10px; 
+            margin-top: 10px; 
+            border-radius: 5px; 
+            font-size: 14px;
+        }
+
+        .status { font-weight: bold; color: green; }
+        
+        button { 
+            padding: 10px 15px; cursor: pointer; color: white; border: none; border-radius: 6px; font-weight: bold; margin-top: 5px;
+        }
+        .btn-blue { background: #007bff; }
+        .btn-blue:hover { background: #0056b3; }
+        .btn-orange { background: #fd7e14; }
+        .btn-orange:hover { background: #e36209; }
+        .btn-green { background: #28a745; }
+        
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 60px; text-align: center; }
+        label { font-weight: 500; }
+    </style>
+</head>
+<body>
+
+    <!-- KHUNG TÀI XẾ -->
+    <div class="box">
+        <h2>🚗 App Tài Xế (Giả lập)</h2>
+        <p>Kết nối: <span id="driver-status" style="color:red">Đang kết nối...</span></p>
+        
+        <div style="background: #e9ecef; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+            <label>ID Chuyến:</label>
+            <input type="number" id="tripId" value="1">
+            <button class="btn-blue" onclick="joinTripDriver()">1. Vào Chuyến Xe</button>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 10px; border-radius: 8px;">
+            <button class="btn-orange" onclick="startMoving()">2. Bắt đầu lái xe (Auto)</button>
+            <p style="font-size: 13px; color: #666; margin-bottom: 0;"><i>(Xe sẽ tự động chạy và gửi tọa độ mỗi 2 giây)</i></p>
+            <div id="driver-log" style="font-family: monospace; margin-top: 5px; color: #333;">...</div>
+        </div>
+    </div>
+
+    <!-- KHUNG PHỤ HUYNH -->
+    <div class="box" style="width: 50%;">
+        <h2>👨‍👩‍👧 App Phụ Huynh</h2>
+        <p>Trạng thái: <span id="parent-status">Chưa theo dõi</span></p>
+        
+        <!-- Phần theo dõi bản đồ -->
+        <div style="margin-bottom: 15px;">
+            <label>Xem chuyến:</label>
+            <input type="number" id="scheduleId" value="1">
+            <button class="btn-blue" onclick="joinTripParent()">Xem Bản Đồ</button>
+        </div>
+
+        <!-- Phần nhận thông báo điểm danh -->
+        <div style="border-top: 1px dashed #ccc; padding-top: 10px;">
+            <label>Bạn là Phụ Huynh ID:</label>
+            <input type="number" id="parentId" value="4" style="background: #e8f0fe;">
+            <button class="btn-green" onclick="joinParentRoom()">Nhận thông báo</button>
+            <small>(Mặc định ID 4 là phụ huynh của bé ID 1)</small>
+        </div>
+
+        <!-- Bản đồ -->
+        <div id="map"></div>
+
+        <!-- Log thông báo -->
+        <h4>🔔 Thông báo Điểm danh:</h4>
+        <div id="logs">
+            <div style="color: #999; font-style: italic;">Chưa có thông báo mới...</div>
+        </div>
+    </div>
+
+    <script>
+        // Kết nối Socket
+        const socket = io("http://localhost:3000");
+        let timer = null;
+
+        // ===========================================
+        // 1. CẤU HÌNH BẢN ĐỒ
+        // ===========================================
+        const map = L.map('map').setView([10.762622, 106.660172], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'OpenStreetMap'
+        }).addTo(map);
+
+        const busIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+        });
+        let busMarker = L.marker([10.762622, 106.660172], {icon: busIcon}).addTo(map);
+
+        // ===========================================
+        // 2. LOGIC SOCKET
+        // ===========================================
+        socket.on("connect", () => {
+            document.getElementById("driver-status").innerText = "Online ✅";
+            document.getElementById("driver-status").style.color = "green";
+        });
+
+        // --- TÀI XẾ ---
+        function joinTripDriver() {
+            const id = document.getElementById("tripId").value;
+            socket.emit("join_trip", { schedule_id: id });
+            alert(`Tài xế đã vào chuyến số ${id}`);
+        }
+
+        function startMoving() {
+            const id = document.getElementById("tripId").value;
+            let lat = 10.762622;
+            let lng = 106.660172;
+
+            if (timer) clearInterval(timer);
+            
+            timer = setInterval(() => {
+                lat += 0.0001; 
+                lng += 0.0001;
+
+                socket.emit("driver_send_location", {
+                    schedule_id: id,
+                    lat: lat,
+                    lng: lng,
+                    speed: 30
+                });
+                
+                document.getElementById("driver-log").innerText = `Đang gửi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            }, 2000);
+        }
+
+        // --- PHỤ HUYNH (MAP) ---
+        function joinTripParent() {
+            const id = document.getElementById("scheduleId").value;
+            socket.emit("join_trip", { schedule_id: id });
+            document.getElementById("parent-status").innerText = `Đang xem chuyến ${id}`;
+        }
+
+        socket.on("update_location", (data) => {
+            const { lat, lng } = data;
+            busMarker.setLatLng([lat, lng]);
+            map.panTo([lat, lng]); 
+        });
+
+        // --- PHỤ HUYNH (THÔNG BÁO ĐIỂM DANH) ---
+        function joinParentRoom() {
+            const pid = document.getElementById("parentId").value;
+            // Gửi event để server biết đây là Phụ huynh số mấy
+            socket.emit("join_room_parent", { parent_id: pid });
+            alert(`Đã đăng nhập Phụ huynh ID ${pid}. Đang chờ tin nhắn...`);
+        }
+
+        // Lắng nghe sự kiện từ Server (Tracking Controller bắn sang)
+        socket.on("child_status_change", (data) => {
+            const logBox = document.getElementById("logs");
+            
+            // Xóa dòng "Chưa có thông báo" nếu có
+            if(logBox.innerHTML.includes("Chưa có thông báo")) logBox.innerHTML = "";
+
+            const time = new Date(data.time).toLocaleTimeString();
+            const color = data.status === 'picked_up' ? 'green' : 'blue';
+            
+            // Thêm thông báo mới vào đầu danh sách
+            logBox.innerHTML = `
+                <div style="border-bottom: 1px solid #ddd; padding: 5px 0;">
+                    <strong style="color:${color}">[${time}]</strong> ${data.message}
+                </div>
+            ` + logBox.innerHTML;
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+require("dotenv").config();
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const { pool } = require("./src/config/db"); // Kết nối DB
+
+// 1. Khởi tạo App
+const app = express();
+const server = http.createServer(app);
+
+// 2. Cấu hình Socket
+const io = socketIo(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] }
+});
+
+// =======================================================
+// 3. MIDDLEWARES (PHẢI NẰM TRÊN CÙNG - TRƯỚC MỌI ROUTE)
+// =======================================================
+app.use(express.json()); 
+app.use(helmet());
+app.use(cors());
+app.use(morgan("dev"));
+
+// Middleware gán biến 'io'
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
+
+// =======================================================
+// 4. ROUTES (NẰM SAU MIDDLEWARES)
+// =======================================================
+const authRoutes = require("./src/routes/auth.routes");
+const scheduleRoutes = require("./src/routes/schedule.routes");
+const trackingRoutes = require("./src/routes/tracking.routes");
+
+app.get("/", (req, res) => res.send("SSB Backend Server is running..."));
+
+// Các API chính
+app.use("/api/auth", authRoutes);
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/tracking", trackingRoutes);
+
+// =======================================================
+// 5. SERVER START
+// =======================================================
+io.on("connection", (socket) => {
+    console.log(">> Socket connected:", socket.id);
+    require("./src/sockets/tracking.socket")(io, socket);
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`✅ Server đang chạy tại: http://localhost:${PORT}`);
+});
