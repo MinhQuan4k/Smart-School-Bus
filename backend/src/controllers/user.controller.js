@@ -18,7 +18,7 @@ exports.createDriver = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// --- PHỤ HUYNH (Mới thêm) ---
+// --- PHỤ HUYNH ---
 exports.getParents = async (req, res, next) => {
     try {
         const data = await userModel.getUsersByRole('parent');
