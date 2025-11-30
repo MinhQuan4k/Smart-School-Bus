@@ -26,4 +26,9 @@ async function deleteRoute(id) {
     return result.affectedRows;
 }
 
-module.exports = { getAllRoutes, createRoute, updateRoute, deleteRoute };
+module.exports = { 
+    getAllRoutes, 
+    createRoute, 
+    updateRoute, 
+    deleteRoute 
+};

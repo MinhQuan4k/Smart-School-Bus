@@ -18,4 +18,8 @@ async function deleteBus(id) {
     return result.affectedRows;
 }
 
-module.exports = { getAllBuses, createBus, deleteBus };
+module.exports = { 
+    getAllBuses, 
+    createBus, 
+    deleteBus 
+};

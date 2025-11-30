@@ -4,18 +4,19 @@ import MapTracking from './components/MapTracking';
 import Login from './components/Login';
 import RoutesManager from './components/RoutesManager';
 import StudentManager from './components/StudentManager';
-import BusManager from './components/BusManager';       // <--- Mới
-import DriverManager from './components/DriverManager'; // <--- Mới
+import BusManager from './components/BusManager';
+import DriverManager from './components/DriverManager';
+import ParentManager from './components/ParentManager'; // <--- Module Phụ Huynh
 
 function App() {
   // 1. Khởi tạo State
-  // Lấy token từ bộ nhớ trình duyệt (nếu có) để giữ đăng nhập khi F5
+  // Lấy token từ bộ nhớ trình duyệt để giữ đăng nhập khi F5
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   
-  // State quản lý Tab đang chọn (Mặc định là dashboard)
+  // Quản lý Tab đang chọn (Mặc định là dashboard)
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // State dữ liệu cho Dashboard
+  // Dữ liệu cho Dashboard
   const [schedules, setSchedules] = useState([]); 
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [error, setError] = useState(null);
@@ -27,14 +28,14 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => {
-        // --- LỚP BẢO VỆ: Kiểm tra dữ liệu an toàn trước khi dùng ---
+        // --- LỚP BẢO VỆ: Kiểm tra dữ liệu an toàn ---
         const data = res.data?.data;
         if(Array.isArray(data)) {
           setSchedules(data);
           // Tự động chọn chuyến đầu tiên để hiển thị map ngay
           if(data.length > 0 && !selectedTrip) setSelectedTrip(data[0].schedule_id);
         } else {
-          setSchedules([]); // Trả về mảng rỗng để an toàn, tránh lỗi .map()
+          setSchedules([]); // Trả về mảng rỗng để an toàn
         }
       })
       .catch(err => {
@@ -46,7 +47,29 @@ function App() {
     }
   }, [token, activeTab]);
 
-  // 3. Hàm Xử lý Đăng xuất
+  // 3. Hàm Xuất Báo Cáo Excel
+  const handleExport = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/api/reports/attendance', {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob', // Quan trọng: Báo cho axios biết đây là file binary
+      });
+
+      // Tạo link ảo để tải xuống
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+      link.setAttribute('download', `BaoCao_DiemDanh_${dateStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert("Lỗi tải báo cáo: " + (err.message || "Server error"));
+    }
+  };
+
+  // 4. Hàm Đăng xuất
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -104,6 +127,13 @@ function App() {
         >
           👨‍✈️ Tài xế
         </div>
+
+        <div 
+          className={`menu-item ${activeTab === 'parents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('parents')}
+        >
+          👨‍👩‍👧 Phụ huynh
+        </div>
         
         <button className="logout-btn" onClick={handleLogout}>Đăng xuất</button>
       </div>
@@ -117,6 +147,7 @@ function App() {
             {activeTab === 'students' && 'Quản lý Học sinh'}
             {activeTab === 'buses' && 'Quản lý Đội Xe'}
             {activeTab === 'drivers' && 'Quản lý Tài Xế'}
+            {activeTab === 'parents' && 'Quản lý Phụ Huynh'}
           </h2>
           {error && <span style={{color:'red', marginLeft: 10, fontSize: 14}}>⚠️ {error}</span>}
           <div style={{color: '#64748b'}}>Xin chào, Admin</div>
@@ -124,35 +155,13 @@ function App() {
 
         {/* --- KHU VỰC HIỂN THỊ NỘI DUNG THEO TAB --- */}
 
-        {/* TAB 1: QUẢN LÝ HỌC SINH */}
-        {activeTab === 'students' && (
-          <div style={{ padding: '20px', overflowY: 'auto', height: 'calc(100vh - 80px)' }}>
-            <StudentManager />
-          </div>
-        )}
+        {activeTab === 'students' && <div style={{ padding: '20px', overflowY: 'auto' }}><StudentManager /></div>}
+        {activeTab === 'routes' && <div style={{ padding: '20px', overflowY: 'auto' }}><RoutesManager /></div>}
+        {activeTab === 'buses' && <div style={{ padding: '20px', overflowY: 'auto' }}><BusManager /></div>}
+        {activeTab === 'drivers' && <div style={{ padding: '20px', overflowY: 'auto' }}><DriverManager /></div>}
+        {activeTab === 'parents' && <div style={{ padding: '20px', overflowY: 'auto' }}><ParentManager /></div>}
 
-        {/* TAB 2: QUẢN LÝ TUYẾN ĐƯỜNG */}
-        {activeTab === 'routes' && (
-          <div style={{ padding: '20px', overflowY: 'auto', height: 'calc(100vh - 80px)' }}>
-            <RoutesManager />
-          </div>
-        )}
-
-        {/* TAB 3: QUẢN LÝ XE (MỚI) */}
-        {activeTab === 'buses' && (
-          <div style={{ padding: '20px', overflowY: 'auto', height: 'calc(100vh - 80px)' }}>
-            <BusManager />
-          </div>
-        )}
-
-        {/* TAB 4: QUẢN LÝ TÀI XẾ (MỚI) */}
-        {activeTab === 'drivers' && (
-          <div style={{ padding: '20px', overflowY: 'auto', height: 'calc(100vh - 80px)' }}>
-            <DriverManager />
-          </div>
-        )}
-
-        {/* TAB 5: DASHBOARD GIÁM SÁT */}
+        {/* TAB DASHBOARD */}
         {activeTab === 'dashboard' && (
           <>
             {/* Thẻ thống kê nhanh */}
@@ -173,6 +182,21 @@ function App() {
                 </div>
                 <div style={{fontSize: '30px'}}>📡</div>
               </div>
+              
+              {/* Nút Xuất Báo Cáo */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+                  <button 
+                    onClick={handleExport}
+                    style={{
+                      background: '#10b981', color: 'white', padding: '12px 24px', 
+                      border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold',
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    📥 Xuất Báo Cáo
+                  </button>
+               </div>
             </div>
 
             {/* Khu vực Bản đồ & Danh sách xe */}
