@@ -12,7 +12,13 @@ async function createBus({ license_plate, brand, capacity }) {
     );
     return result.insertId;
 }
-
+async function updateBus(id, { license_plate, brand, capacity, status }) {
+    const [result] = await pool.query(
+        "UPDATE buses SET license_plate = ?, brand = ?, capacity = ?, status = ? WHERE bus_id = ?",
+        [license_plate, brand, capacity, status || 'active', id]
+    );
+    return result.affectedRows;
+}
 async function deleteBus(id) {
     const [result] = await pool.query("DELETE FROM buses WHERE bus_id = ?", [id]);
     return result.affectedRows;
@@ -20,6 +26,7 @@ async function deleteBus(id) {
 
 module.exports = { 
     getAllBuses, 
-    createBus, 
+    createBus,
+     updateBus, 
     deleteBus 
 };

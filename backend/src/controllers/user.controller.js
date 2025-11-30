@@ -1,7 +1,7 @@
 const userModel = require("../models/user.model");
 const bcrypt = require("bcrypt");
 
-// --- TÀI XẾ (Code cũ) ---
+// --- TÀI XẾ  ---
 exports.getDrivers = async (req, res, next) => {
     try {
         const data = await userModel.getUsersByRole('driver');
@@ -39,7 +39,15 @@ exports.createParent = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+
 // --- CHUNG ---
+exports.updateUser = async (req, res, next) => {
+    try {
+        const affected = await userModel.updateUser(req.params.id, req.body);
+        if (affected === 0) return res.status(404).json({ error: "Không tìm thấy tài khoản" });
+        res.json({ success: true, message: "Cập nhật thành công" });
+    } catch (err) { next(err); }
+};
 exports.deleteUser = async (req, res, next) => {
     try {
         await userModel.deleteUser(req.params.id);

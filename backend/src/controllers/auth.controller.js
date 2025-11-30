@@ -8,13 +8,17 @@ exports.register = async (req, res, next) => {
     try {
         const { full_name, phone, password, role } = req.body;
 
+        if (!full_name || !phone || !password) {
+            return res.status(400).json({ success: false, error: "Vui lòng nhập đủ thông tin." });
+        }
+
         // 1. Kiểm tra xem SĐT đã tồn tại chưa
         const existingUser = await userModel.findUserByPhone(phone);
         if (existingUser) {
             return res.status(409).json({ success: false, error: "Số điện thoại đã được sử dụng." });
         }
 
-        // 2. Mã hóa mật khẩu (Hashing) - QUAN TRỌNG
+        // 2. Mã hóa mật khẩu
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -37,31 +41,38 @@ exports.register = async (req, res, next) => {
     }
 };
 
-// --- ĐĂNG NHẬP ---
+// --- ĐĂNG NHẬP (Đã sửa lỗi Crash) ---
 exports.login = async (req, res, next) => {
     try {
         const { phone, password } = req.body;
 
         // 1. Tìm user trong DB
         const user = await userModel.findUserByPhone(phone);
+        
+        // --- QUAN TRỌNG: Kiểm tra user có tồn tại không trước ---
         if (!user) {
-            return res.status(401).json({ success: false, error: "Sai số điện thoại hoặc mật khẩu." });
+            return res.status(401).json({ success: false, error: "Số điện thoại chưa được đăng ký." });
         }
 
-        // 2. So sánh mật khẩu (Mật khẩu nhập vs Mật khẩu mã hóa trong DB)
+        // --- Kiểm tra xem user có mật khẩu không (tránh lỗi data rác) ---
+        if (!user.password) {
+            return res.status(500).json({ success: false, error: "Lỗi dữ liệu tài khoản (Thiếu mật khẩu)." });
+        }
+
+        // 2. So sánh mật khẩu
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ success: false, error: "Sai số điện thoại hoặc mật khẩu." });
+            return res.status(401).json({ success: false, error: "Sai mật khẩu." });
         }
 
-        // 3. Tạo Token (JWT) - "Tấm vé thông hành"
+        // 3. Tạo Token
         const payload = {
             id: user.user_id,
             role: user.role,
             name: user.full_name
         };
         
-        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1d" }); // Token sống 1 ngày
+        const token = jwt.sign(payload, process.env.JWT_SECRET || "secret_key", { expiresIn: "30d" });
 
         // 4. Trả về kết quả
         res.json({

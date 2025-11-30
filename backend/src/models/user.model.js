@@ -41,11 +41,20 @@ async function deleteUser(id) {
     const [result] = await pool.query("DELETE FROM users WHERE user_id = ?", [id]);
     return result.affectedRows;
 }
+//6. Cập nhật user
+async function updateUser(id, { full_name, phone }) {
+    const [result] = await pool.query(
+        "UPDATE users SET full_name = ?, phone = ? WHERE user_id = ?",
+        [full_name, phone, id]
+    );
+    return result.affectedRows;
+}
 
 module.exports = {
     findUserByPhone,
     createUser,
     findUserById,
     getUsersByRole, 
-    deleteUser
+    deleteUser,
+    updateUser
 };

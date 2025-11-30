@@ -13,7 +13,13 @@ exports.create = async (req, res, next) => {
         res.json({ success: true, message: "Thêm xe thành công" });
     } catch (err) { next(err); }
 };
-
+exports.update = async (req, res, next) => {
+    try {
+        const affected = await busModel.updateBus(req.params.id, req.body);
+        if (affected === 0) return res.status(404).json({ error: "Không tìm thấy xe" });
+        res.json({ success: true, message: "Cập nhật thành công" });
+    } catch (err) { next(err); }
+};
 exports.delete = async (req, res, next) => {
     try {
         await busModel.deleteBus(req.params.id);

@@ -5,6 +5,7 @@ const { verifyToken, isAdmin } = require("../middlewares/auth.middleware");
 
 router.get("/", verifyToken, busController.list);
 router.post("/", verifyToken, isAdmin, busController.create);
+router.put("/:id", verifyToken, isAdmin, busController.update);
 router.delete("/:id", verifyToken, isAdmin, busController.delete);
 
 module.exports = router;
