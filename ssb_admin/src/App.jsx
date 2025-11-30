@@ -7,56 +7,49 @@ import StudentManager from './components/StudentManager';
 import BusManager from './components/BusManager';
 import DriverManager from './components/DriverManager';
 import ParentManager from './components/ParentManager';
-import ScheduleManager from './components/ScheduleManager'; // <--- Import Module Lịch Trình
+import ScheduleManager from './components/ScheduleManager';
+import NotificationManager from './components/NotificationManager'; 
 
 function App() {
   // 1. Khởi tạo State
-  // Lấy token từ bộ nhớ trình duyệt để giữ đăng nhập khi F5
   const [token, setToken] = useState(() => localStorage.getItem('token'));
-  
-  // Quản lý Tab đang chọn (Mặc định là dashboard)
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Dữ liệu cho Dashboard
+  // Dữ liệu Dashboard
   const [schedules, setSchedules] = useState([]); 
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [error, setError] = useState(null);
 
-  // 2. Gọi API lấy dữ liệu Dashboard (Chỉ chạy khi ở tab Dashboard & có Token)
+  // 2. Gọi API Dashboard
   useEffect(() => {
     if (token && activeTab === 'dashboard') {
       axios.get('http://localhost:3000/api/schedules', {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => {
-        // --- LỚP BẢO VỆ: Kiểm tra dữ liệu an toàn ---
         const data = res.data?.data;
         if(Array.isArray(data)) {
           setSchedules(data);
-          // Tự động chọn chuyến đầu tiên để hiển thị map ngay
           if(data.length > 0 && !selectedTrip) setSelectedTrip(data[0].schedule_id);
         } else {
-          setSchedules([]); // Trả về mảng rỗng để an toàn
+          setSchedules([]);
         }
       })
       .catch(err => {
-        console.error("Lỗi API Dashboard:", err);
-        // Nếu lỗi 401 (Hết hạn Token) -> Tự động đăng xuất
+        console.error("Lỗi API:", err);
         if(err.response?.status === 401) handleLogout();
-        else setError("Không kết nối được Server (Port 3000).");
+        else setError("Lỗi kết nối Server.");
       });
     }
   }, [token, activeTab]);
 
-  // 3. Hàm Xuất Báo Cáo Excel
+  // 3. Xuất Excel
   const handleExport = async () => {
     try {
       const response = await axios.get('http://localhost:3000/api/reports/attendance', {
         headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob', // Quan trọng: Báo cho axios biết đây là file binary
+        responseType: 'blob',
       });
-
-      // Tạo link ảo để tải xuống
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -65,204 +58,97 @@ function App() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-    } catch (err) {
-      alert("Lỗi tải báo cáo: " + (err.message || "Server error"));
-    }
+    } catch (err) { alert("Lỗi tải báo cáo."); }
   };
 
-  // 4. Hàm Đăng xuất
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken(null);
   };
 
-  // --- MÀN HÌNH LOGIN (Nếu chưa có Token) ---
-  if (!token) return (
-    <div className="login-container">
-      <div className="login-box">
-        <Login onLoginSuccess={setToken} />
-      </div>
-    </div>
-  );
+  if (!token) return <div className="login-container"><div className="login-box"><Login onLoginSuccess={setToken} /></div></div>;
 
-  // --- GIAO DIỆN CHÍNH (Admin Dashboard) ---
   return (
     <div className="app-container">
       
-      {/* CỘT TRÁI: MENU ĐIỀU HƯỚNG */}
+      {/* SIDEBAR */}
       <div className="sidebar">
         <div className="brand">🚍 SSB Admin</div>
         
-        <div 
-          className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
+        <div className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
           📊 Giám sát (Live)
         </div>
 
-        <div 
-          className={`menu-item ${activeTab === 'schedule_create' ? 'active' : ''}`}
-          onClick={() => setActiveTab('schedule_create')}
-        >
-          📅 Phân công Lịch trình
+        <div className={`menu-item ${activeTab === 'schedule_create' ? 'active' : ''}`} onClick={() => setActiveTab('schedule_create')}>
+          📅 Phân công Lịch
+        </div>
+
+        <div className={`menu-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>
+          🔔 Gửi Thông báo
         </div>
         
-        <div 
-          className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`}
-          onClick={() => setActiveTab('routes')}
-        >
-          🛣️ Tuyến đường
-        </div>
+        <div style={{height: 1, background: '#334155', margin: '10px 0'}}></div>
 
-        <div 
-          className={`menu-item ${activeTab === 'students' ? 'active' : ''}`}
-          onClick={() => setActiveTab('students')}
-        >
-          🎓 Học sinh
-        </div>
-
-        <div 
-          className={`menu-item ${activeTab === 'buses' ? 'active' : ''}`}
-          onClick={() => setActiveTab('buses')}
-        >
-          🚌 Quản lý Xe
-        </div>
-
-        <div 
-          className={`menu-item ${activeTab === 'drivers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('drivers')}
-        >
-          👨‍✈️ Tài xế
-        </div>
-
-        <div 
-          className={`menu-item ${activeTab === 'parents' ? 'active' : ''}`}
-          onClick={() => setActiveTab('parents')}
-        >
-          👨‍👩‍👧 Phụ huynh
-        </div>
+        <div className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`} onClick={() => setActiveTab('routes')}>🛣️ Tuyến đường</div>
+        <div className={`menu-item ${activeTab === 'students' ? 'active' : ''}`} onClick={() => setActiveTab('students')}>🎓 Học sinh</div>
+        <div className={`menu-item ${activeTab === 'buses' ? 'active' : ''}`} onClick={() => setActiveTab('buses')}>🚌 Quản lý Xe</div>
+        <div className={`menu-item ${activeTab === 'drivers' ? 'active' : ''}`} onClick={() => setActiveTab('drivers')}>👨‍✈️ Tài xế</div>
+        <div className={`menu-item ${activeTab === 'parents' ? 'active' : ''}`} onClick={() => setActiveTab('parents')}>👨‍👩‍👧 Phụ huynh</div>
         
         <button className="logout-btn" onClick={handleLogout}>Đăng xuất</button>
       </div>
 
-      {/* CỘT PHẢI: NỘI DUNG CHÍNH */}
+      {/* CONTENT */}
       <div className="main-content">
         <div className="top-bar">
           <h2>
             {activeTab === 'dashboard' && 'Dashboard Giám Sát'}
             {activeTab === 'schedule_create' && 'Phân công Lịch trình'}
+            {activeTab === 'notifications' && 'Gửi Thông báo'}
             {activeTab === 'routes' && 'Quản lý Tuyến đường'}
             {activeTab === 'students' && 'Quản lý Học sinh'}
             {activeTab === 'buses' && 'Quản lý Đội Xe'}
             {activeTab === 'drivers' && 'Quản lý Tài Xế'}
             {activeTab === 'parents' && 'Quản lý Phụ Huynh'}
           </h2>
-          {error && <span style={{color:'red', marginLeft: 10, fontSize: 14}}>⚠️ {error}</span>}
+          {error && <span style={{color:'red', marginLeft: 10}}>⚠️ {error}</span>}
           <div style={{color: '#64748b'}}>Xin chào, Admin</div>
         </div>
 
-        {/* --- KHU VỰC HIỂN THỊ NỘI DUNG THEO TAB --- */}
+        {/* --- ROUTER NỘI DUNG --- */}
+        {activeTab === 'schedule_create' && <div style={{ padding: 20, overflowY: 'auto' }}><ScheduleManager /></div>}
+        {activeTab === 'notifications' && <div style={{ padding: 20, overflowY: 'auto' }}><NotificationManager /></div>}
+        {activeTab === 'students' && <div style={{ padding: 20, overflowY: 'auto' }}><StudentManager /></div>}
+        {activeTab === 'routes' && <div style={{ padding: 20, overflowY: 'auto' }}><RoutesManager /></div>}
+        {activeTab === 'buses' && <div style={{ padding: 20, overflowY: 'auto' }}><BusManager /></div>}
+        {activeTab === 'drivers' && <div style={{ padding: 20, overflowY: 'auto' }}><DriverManager /></div>}
+        {activeTab === 'parents' && <div style={{ padding: 20, overflowY: 'auto' }}><ParentManager /></div>}
 
-        {activeTab === 'schedule_create' && <div style={{ padding: '20px', overflowY: 'auto' }}><ScheduleManager /></div>}
-        {activeTab === 'students' && <div style={{ padding: '20px', overflowY: 'auto' }}><StudentManager /></div>}
-        {activeTab === 'routes' && <div style={{ padding: '20px', overflowY: 'auto' }}><RoutesManager /></div>}
-        {activeTab === 'buses' && <div style={{ padding: '20px', overflowY: 'auto' }}><BusManager /></div>}
-        {activeTab === 'drivers' && <div style={{ padding: '20px', overflowY: 'auto' }}><DriverManager /></div>}
-        {activeTab === 'parents' && <div style={{ padding: '20px', overflowY: 'auto' }}><ParentManager /></div>}
-
-        {/* TAB DASHBOARD */}
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Thẻ thống kê nhanh */}
             <div className="stats-grid">
-              <div className="stat-card">
-                <div>
-                  <div className="stat-number">{schedules.length}</div>
-                  <div className="stat-label">Tổng chuyến hôm nay</div>
-                </div>
-                <div style={{fontSize: '30px'}}>🚌</div>
-              </div>
-              <div className="stat-card">
-                <div>
-                  <div className="stat-number" style={{color: '#10b981'}}>
-                    {schedules.filter(s => s.status === 'running').length}
-                  </div>
-                  <div className="stat-label">Đang chạy</div>
-                </div>
-                <div style={{fontSize: '30px'}}>📡</div>
-              </div>
-              
-              {/* Nút Xuất Báo Cáo */}
+              <div className="stat-card"><div><div className="stat-number">{schedules.length}</div><div className="stat-label">Tổng chuyến</div></div><div style={{fontSize: 30}}>🚌</div></div>
+              <div className="stat-card"><div><div className="stat-number" style={{color: '#10b981'}}>{schedules.filter(s => s.status === 'running').length}</div><div className="stat-label">Đang chạy</div></div><div style={{fontSize: 30}}>📡</div></div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginLeft: 'auto' }}>
-                  <button 
-                    onClick={handleExport}
-                    style={{
-                      background: '#10b981', color: 'white', padding: '12px 24px', 
-                      border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold',
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    📥 Xuất Báo Cáo
-                  </button>
+                  <button onClick={handleExport} style={{ background: '#10b981', color: 'white', padding: '12px 24px', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold' }}>📥 Xuất Báo Cáo</button>
                </div>
             </div>
 
-            {/* Khu vực Bản đồ & Danh sách xe */}
             <div className="dashboard-view">
-              
-              {/* Danh sách xe bên trái */}
               <div className="list-panel">
                 <div className="table-container">
-                  {schedules.length === 0 ? (
-                    <div style={{padding:20, textAlign: 'center', color: '#999'}}>
-                      Chưa có chuyến xe nào được tạo hôm nay.
-                    </div>
-                  ) : (
+                  {schedules.length === 0 ? <p style={{padding:20}}>Chưa có dữ liệu.</p> : (
                     <table>
-                      <thead>
-                        <tr>
-                          <th>Tuyến</th>
-                          <th>Biển số</th>
-                          <th>Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {schedules.map(item => (
-                          <tr 
-                            key={item.schedule_id} 
-                            className={selectedTrip === item.schedule_id ? 'selected' : ''} 
-                            onClick={() => setSelectedTrip(item.schedule_id)}
-                          >
-                            <td>
-                              <div style={{fontWeight: '600'}}>{item.route_name || 'Chưa đặt tên'}</div>
-                              <div style={{fontSize: '12px', color: '#888'}}>{item.driver_name}</div>
-                            </td>
-                            <td>{item.license_plate}</td>
-                            <td>
-                              <span className={`badge ${item.status}`}>
-                                {item.status === 'running' ? 'Running' : 'Pending'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
+                      <thead><tr><th>Tuyến</th><th>Biển số</th><th>TT</th></tr></thead>
+                      <tbody>{schedules.map(item => (<tr key={item.schedule_id} className={selectedTrip === item.schedule_id ? 'selected' : ''} onClick={() => setSelectedTrip(item.schedule_id)}><td>{item.route_name}</td><td>{item.license_plate}</td><td><span className={`badge ${item.status}`}>{item.status}</span></td></tr>))}</tbody>
                     </table>
                   )}
                 </div>
               </div>
-
-              {/* Bản đồ Real-time bên phải */}
               <div className="map-panel">
-                {selectedTrip ? (
-                   // Dùng key để reset map hoàn toàn khi người dùng đổi chuyến xe khác
-                   <MapTracking key={selectedTrip} scheduleId={selectedTrip} />
-                ) : (
-                  <div style={{display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#999'}}>
-                    <p>👈 Chọn một chuyến xe bên trái để xem vị trí</p>
-                  </div>
-                )}
+                {selectedTrip ? <MapTracking key={selectedTrip} scheduleId={selectedTrip} /> : <p style={{textAlign:'center', marginTop:50}}>Chọn một chuyến xe</p>}
               </div>
             </div>
           </>

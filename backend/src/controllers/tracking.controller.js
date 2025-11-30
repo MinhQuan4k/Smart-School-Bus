@@ -56,3 +56,14 @@ exports.updateAttendance = async (req, res, next) => {
         next(err);
     }
 };
+// API lấy toàn bộ log vị trí của 1 chuyến xe
+exports.getTripHistory = async (req, res, next) => {
+    try {
+        const { schedule_id } = req.params;
+        const [rows] = await pool.query(
+            "SELECT latitude, longitude, speed, recorded_at FROM location_logs WHERE schedule_id = ? ORDER BY log_id ASC",
+            [schedule_id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+};

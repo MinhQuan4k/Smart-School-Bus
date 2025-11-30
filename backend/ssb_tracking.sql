@@ -145,3 +145,6 @@ INSERT INTO schedules (schedule_id, route_id, bus_id, driver_id, date, start_tim
 INSERT INTO trip_attendance (schedule_id, student_id, status) VALUES 
 (1, 1, 'not_picked');
 DELETE FROM users WHERE user_id = 1;
+ALTER TABLE students 
+ADD COLUMN latitude DECIMAL(10, 8) DEFAULT 10.762622,
+ADD COLUMN longitude DECIMAL(11, 8) DEFAULT 106.660172;
