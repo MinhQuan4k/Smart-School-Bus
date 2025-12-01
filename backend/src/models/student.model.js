@@ -19,19 +19,19 @@ async function getStudentById(id) {
 }
 
 // 3. Thêm học sinh mới
-async function createStudent({ parent_id, full_name, class_name, pickup_address }) {
+async function createStudent({ parent_id, full_name, class_name, stop_id }) {
     const [result] = await pool.query(
-        "INSERT INTO students (parent_id, full_name, class_name, pickup_address) VALUES (?, ?, ?, ?)",
-        [parent_id, full_name, class_name, pickup_address]
+        "INSERT INTO students (parent_id, full_name, class_name, stop_id) VALUES (?, ?, ?, ?)",
+        [parent_id, full_name, class_name, stop_id]
     );
     return result.insertId;
 }
 
 // 4. Cập nhật học sinh
-async function updateStudent(id, { full_name, class_name, pickup_address }) {
+async function updateStudent(id, { full_name, class_name, stop_id }) {
     const [result] = await pool.query(
-        "UPDATE students SET full_name = ?, class_name = ?, pickup_address = ? WHERE student_id = ?",
-        [full_name, class_name, pickup_address, id]
+        "UPDATE students SET full_name = ?, class_name = ?, stop_id = ? WHERE student_id = ?",
+        [full_name, class_name, stop_id, id]
     );
     return result.affectedRows;
 }

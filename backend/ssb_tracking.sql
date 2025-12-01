@@ -1,30 +1,33 @@
+-- =============================================================
+-- PHẦN 1: KHỞI TẠO DATABASE
+-- =============================================================
 DROP DATABASE IF EXISTS ssb_bus_tracking;
 CREATE DATABASE ssb_bus_tracking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE ssb_bus_tracking;
 
-SET FOREIGN_KEY_CHECKS = 0; -- Tắt kiểm tra khóa ngoại để tạo bảng trơn tru
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- =============================================================
--- PHẦN 2: TẠO CÁC BẢNG (STRUCTURE)
+-- PHẦN 2: TẠO BẢNG (STRUCTURE)
 -- =============================================================
 
--- 1. Bảng USERS (Lưu tất cả tài khoản)
+-- 1. Bảng USERS
 CREATE TABLE users (
     user_id INT PRIMARY KEY AUTO_INCREMENT,
     full_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(15) NOT NULL UNIQUE, -- Tài khoản đăng nhập
-    password VARCHAR(255) NOT NULL,    -- Mật khẩu đã mã hóa
+    phone VARCHAR(15) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'driver', 'parent') NOT NULL DEFAULT 'parent',
+    address VARCHAR(255) DEFAULT NULL,
     avatar VARCHAR(255) DEFAULT NULL,
-    address TEXT,
-    fcm_token VARCHAR(255) DEFAULT NULL, -- Token để bắn thông báo
+    fcm_token VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 2. Bảng XE BUÝT (BUSES)
 CREATE TABLE buses (
     bus_id INT PRIMARY KEY AUTO_INCREMENT,
-    license_plate VARCHAR(20) NOT NULL UNIQUE, -- Biển số (VD: 59B-123.45)
+    license_plate VARCHAR(20) NOT NULL UNIQUE,
     brand VARCHAR(50),
     capacity INT NOT NULL DEFAULT 16,
     status ENUM('active', 'maintenance', 'inactive') DEFAULT 'active'
@@ -34,32 +37,59 @@ CREATE TABLE buses (
 CREATE TABLE routes (
     route_id INT PRIMARY KEY AUTO_INCREMENT,
     route_name VARCHAR(100) NOT NULL, 
-    start_point VARCHAR(255) NOT NULL,
-    end_point VARCHAR(255) NOT NULL,
+    start_point VARCHAR(255) NOT NULL, -- Điểm xuất phát chung
+    end_point VARCHAR(255) NOT NULL,   -- Điểm kết thúc chung
+    estimated_duration INT DEFAULT 60, -- Tổng thời gian chạy (phút)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 4. Bảng HỌC SINH (STUDENTS)
+-- 4. [MỚI] Bảng TRẠM DỪNG (STOPS)
+-- Lưu danh sách các điểm đón trả cố định
+CREATE TABLE stops (
+    stop_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,        -- Tên trạm (VD: Cổng Siêu thị Go)
+    address VARCHAR(255),              -- Địa chỉ cụ thể
+    latitude DECIMAL(10, 8) NOT NULL,  -- Tọa độ GPS
+    longitude DECIMAL(11, 8) NOT NULL, -- Tọa độ GPS
+    is_school BOOLEAN DEFAULT FALSE,   -- Đánh dấu nếu đây là Trường học
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 5. [MỚI] Bảng LỘ TRÌNH CHI TIẾT (ROUTE_STOPS)
+-- Quy định tuyến A sẽ đi qua những trạm nào, theo thứ tự nào
+CREATE TABLE route_stops (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    route_id INT NOT NULL,
+    stop_id INT NOT NULL,
+    order_index INT NOT NULL,      -- Thứ tự dừng (1, 2, 3...)
+    minutes_from_start INT,        -- Thời gian dự kiến từ điểm xuất phát (phút)
+    
+    FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE CASCADE,
+    FOREIGN KEY (stop_id) REFERENCES stops(stop_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 6. Bảng HỌC SINH (STUDENTS) - Đã sửa
+-- Liên kết học sinh với Trạm đón (thay vì địa chỉ nhà)
 CREATE TABLE students (
     student_id INT PRIMARY KEY AUTO_INCREMENT,
-    parent_id INT NOT NULL,     -- Con của phụ huynh nào
+    parent_id INT NOT NULL,
+    stop_id INT,               -- [QUAN TRỌNG] Bé đón ở trạm nào?
     full_name VARCHAR(100) NOT NULL,
     class_name VARCHAR(20),
     image_url VARCHAR(255),
-    pickup_address TEXT,        -- Điểm đón
-    FOREIGN KEY (parent_id) REFERENCES users(user_id) ON DELETE CASCADE
+    
+    FOREIGN KEY (parent_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (stop_id) REFERENCES stops(stop_id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- 5. Bảng LỊCH TRÌNH (SCHEDULES)
+-- 7. Bảng LỊCH TRÌNH CHẠY (SCHEDULES)
 CREATE TABLE schedules (
     schedule_id INT PRIMARY KEY AUTO_INCREMENT,
     route_id INT NOT NULL,
     bus_id INT NOT NULL,
     driver_id INT NOT NULL,
-    
-    date DATE NOT NULL,              -- Ngày chạy
-    start_time TIME NOT NULL,        -- Giờ xuất phát
-    
+    date DATE NOT NULL,
+    start_time TIME NOT NULL,
     status ENUM('pending', 'running', 'completed', 'cancelled') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
@@ -68,7 +98,7 @@ CREATE TABLE schedules (
     FOREIGN KEY (driver_id) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
--- 6. Bảng ĐIỂM DANH (TRIP_ATTENDANCE)
+-- 8. Bảng ĐIỂM DANH (TRIP_ATTENDANCE)
 CREATE TABLE trip_attendance (
     attendance_id INT PRIMARY KEY AUTO_INCREMENT,
     schedule_id INT NOT NULL,
@@ -81,7 +111,7 @@ CREATE TABLE trip_attendance (
     FOREIGN KEY (student_id) REFERENCES students(student_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 7. Bảng LỊCH SỬ VỊ TRÍ (LOCATION_LOGS)
+-- 9. Bảng LOG VỊ TRÍ (LOCATION_LOGS)
 CREATE TABLE location_logs (
     log_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     schedule_id INT NOT NULL,
@@ -90,61 +120,73 @@ CREATE TABLE location_logs (
     speed FLOAT DEFAULT 0,
     recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX (schedule_id),
     FOREIGN KEY (schedule_id) REFERENCES schedules(schedule_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 8. Bảng THÔNG BÁO (NOTIFICATIONS)
+-- 10. Bảng SỰ CỐ (INCIDENTS)
+CREATE TABLE incidents (
+    incident_id INT PRIMARY KEY AUTO_INCREMENT,
+    schedule_id INT NOT NULL,
+    driver_id INT NOT NULL,
+    type VARCHAR(50),
+    description TEXT,
+    reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (schedule_id) REFERENCES schedules(schedule_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 11. Bảng THÔNG BÁO (NOTIFICATIONS)
 CREATE TABLE notifications (
     noti_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     title VARCHAR(100),
     message TEXT,
+    type ENUM('info', 'alert', 'reminder') DEFAULT 'info',
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-SET FOREIGN_KEY_CHECKS = 1; -- Bật lại kiểm tra
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- =============================================================
--- PHẦN 3: DỮ LIỆU MẪU (SEED DATA) - MẬT KHẨU LÀ "123"
+-- PHẦN 3: DỮ LIỆU MẪU (SEED DATA)
 -- =============================================================
 
--- Hash chuẩn của "123" là: $2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa
-
--- 1. Thêm Users
+-- 1. Users (Pass: 123)
 INSERT INTO users (user_id, full_name, phone, password, role) VALUES 
 (1, 'Admin Quản Trị', 'admin', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'admin'),
 (2, 'Tài Xế Tuấn', '0901111111', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'driver'),
-(3, 'Tài Xế Hùng', '0902222222', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'driver'),
-(4, 'Mẹ Bé Bi', '0903333333', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'parent'),
-(5, 'Bố Bé Bo', '0904444444', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'parent');
+(3, 'Mẹ Bé Bi', '0903333333', '$2b$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa', 'parent');
 
--- 2. Thêm Xe Buýt
-INSERT INTO buses (bus_id, license_plate, brand, capacity) VALUES 
-(1, '59B-123.45', 'Hyundai Solati', 16),
-(2, '59B-999.99', 'Ford Transit', 16);
+-- 2. Xe
+INSERT INTO buses (bus_id, license_plate, brand, capacity) VALUES (1, '59B-123.45', 'Hyundai', 16);
 
--- 3. Thêm Tuyến Đường
+-- 3. Trạm Dừng (Stops) - Dữ liệu thật khu vực Quận 1, TP.HCM
+INSERT INTO stops (stop_id, name, address, latitude, longitude) VALUES 
+(1, 'Trường THPT Lê Hồng Phong', '235 Nguyễn Văn Cừ', 10.762622, 106.682172), -- Điểm cuối
+(2, 'Co.op Mart Cống Quỳnh', '189 Cống Quỳnh', 10.768822, 106.687172),
+(3, 'Công viên 23/9', 'Đường Phạm Ngũ Lão', 10.769922, 106.693172),
+(4, 'Chợ Bến Thành', 'Lê Lợi, Bến Thành', 10.772522, 106.698172);
+
+-- 4. Tuyến Đường (Routes)
 INSERT INTO routes (route_id, route_name, start_point, end_point) VALUES 
-(1, 'Tuyến 01: Q7 - Q1', 'KDC Him Lam', 'Trường Lê Hồng Phong'),
-(2, 'Tuyến 02: Tân Bình - Q3', 'Sân Bay TSN', 'Trường Marie Curie');
+(1, 'Tuyến 01: Trung tâm - Trường LHP', 'Chợ Bến Thành', 'Trường Lê Hồng Phong');
 
--- 4. Thêm Học Sinh
-INSERT INTO students (student_id, parent_id, full_name, class_name) VALUES 
-(1, 4, 'Nguyễn Bé Bi', 'Lớp Lá'),
-(2, 5, 'Trần Bé Bo', 'Lớp Chồi');
+-- 5. Gán Trạm vào Tuyến (Route Stops)
+-- Thứ tự: Chợ Bến Thành (1) -> CV 23/9 (2) -> Co.op Mart (3) -> Trường (4)
+INSERT INTO route_stops (route_id, stop_id, order_index, minutes_from_start) VALUES
+(1, 4, 1, 0),  -- Phút thứ 0
+(1, 3, 2, 10), -- Phút thứ 10
+(1, 2, 3, 20), -- Phút thứ 20
+(1, 1, 4, 30); -- Phút thứ 30 (Đến trường)
 
--- 5. Thêm Lịch Trình (Cho ngày hôm nay)
+-- 6. Học Sinh (Gán vào Trạm cụ thể)
+INSERT INTO students (student_id, parent_id, stop_id, full_name, class_name) VALUES 
+(1, 3, 2, 'Nguyễn Bé Bi', 'Lớp Lá'); -- Bé Bi đón ở Trạm số 2 (Co.op Mart)
+
+-- 7. Lịch trình
 INSERT INTO schedules (schedule_id, route_id, bus_id, driver_id, date, start_time, status) VALUES 
-(1, 1, 1, 2, CURDATE(), '06:30:00', 'running'), -- Chuyến số 1 đang chạy
-(2, 2, 2, 3, CURDATE(), '07:00:00', 'pending'); -- Chuyến số 2 đang chờ
+(1, 1, 1, 2, CURDATE(), '06:30:00', 'running');
 
--- 6. Thêm Điểm Danh (Bé Bi đi chuyến 1)
-INSERT INTO trip_attendance (schedule_id, student_id, status) VALUES 
-(1, 1, 'not_picked');
-DELETE FROM users WHERE user_id = 1;
-ALTER TABLE students 
-ADD COLUMN latitude DECIMAL(10, 8) DEFAULT 10.762622,
-ADD COLUMN longitude DECIMAL(11, 8) DEFAULT 106.660172;
+-- 8. Điểm danh
+INSERT INTO trip_attendance (schedule_id, student_id, status) VALUES (1, 1, 'not_picked');

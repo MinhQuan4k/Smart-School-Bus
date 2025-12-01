@@ -38,3 +38,21 @@ exports.delete = async (req, res, next) => {
         res.json({ success: true, message: "Đã xóa tuyến đường" });
     } catch (err) { next(err); }
 };
+//Lấy chi tiết các trạm của 1 tuyến
+exports.getRouteDetails = async (req, res, next) => {
+    try {
+        const { id } = req.params; // route_id
+
+        // Lấy thông tin trạm theo thứ tự
+        const sql = `
+            SELECT s.stop_id, s.name, s.latitude, s.longitude, rs.order_index
+            FROM route_stops rs
+            JOIN stops s ON rs.stop_id = s.stop_id
+            WHERE rs.route_id = ?
+            ORDER BY rs.order_index ASC
+        `;
+        const [stops] = await pool.query(sql, [id]);
+        
+        res.json({ success: true, data: stops });
+    } catch (err) { next(err); }
+};

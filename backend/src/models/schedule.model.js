@@ -3,8 +3,15 @@ const { pool } = require("../config/db");
 // 1. Lấy danh sách lịch trình (Có thể lọc theo ngày)
 async function getAllSchedules(date) {
     let sql = `
-        SELECT s.schedule_id, s.date, s.start_time, s.status, 
-               r.route_name, b.license_plate, u.full_name as driver_name
+        SELECT  
+                s.schedule_id, 
+                s.route_id,
+                s.date, 
+                s.start_time, 
+                s.status, 
+                r.route_name, 
+                b.license_plate, 
+                u.full_name as driver_name
         FROM schedules s
         JOIN routes r ON s.route_id = r.route_id
         JOIN buses b ON s.bus_id = b.bus_id

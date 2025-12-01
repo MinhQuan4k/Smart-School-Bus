@@ -7,5 +7,6 @@ router.get("/", verifyToken, routeController.list);
 router.post("/", verifyToken, isAdmin, routeController.create);
 router.put("/:id", verifyToken, isAdmin, routeController.update);
 router.delete("/:id", verifyToken, isAdmin, routeController.delete);
+router.get("/:id/stops", verifyToken, routeController.getRouteDetails);
 
 module.exports = router;

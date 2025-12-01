@@ -45,6 +45,7 @@ const parentRoutes = require("./src/routes/parent.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const userRoutes = require("./src/routes/user.routes");
 const incidentRoutes = require("./src/routes/incident.routes");
+const stopRoutes = require("./src/routes/stop.routes");
 app.get("/", (req, res) => res.send("SSB Backend Server is running..."));
 
 // Các API chính
@@ -60,6 +61,7 @@ app.use("/api/parent", parentRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/incidents", incidentRoutes);
+app.use("/api/stops", stopRoutes);
 
 // =======================================================
 // 5. SERVER START

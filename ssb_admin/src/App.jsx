@@ -9,6 +9,7 @@ import DriverManager from './components/DriverManager';
 import ParentManager from './components/ParentManager';
 import ScheduleManager from './components/ScheduleManager';
 import NotificationManager from './components/NotificationManager';
+import StopManager from './components/StopManager';
 
 // Import giao diện người dùng
 import DriverDashboard from './components/DriverDashboard';
@@ -135,6 +136,7 @@ function App() {
         <div className={`menu-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>🔔 Gửi Thông báo</div>
         <div style={{height: 1, backgroundColor: '#334155', margin: '10px 0'}}></div>
         <div className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`} onClick={() => setActiveTab('routes')}>🛣️ Tuyến đường</div>
+        <div className={`menu-item ${activeTab === 'stops' ? 'active' : ''}`} onClick={() => setActiveTab('stops')}>🚏 Trạm Dừng</div>
         <div className={`menu-item ${activeTab === 'students' ? 'active' : ''}`} onClick={() => setActiveTab('students')}>🎓 Học sinh</div>
         <div className={`menu-item ${activeTab === 'buses' ? 'active' : ''}`} onClick={() => setActiveTab('buses')}>🚌 Quản lý Xe</div>
         <div className={`menu-item ${activeTab === 'drivers' ? 'active' : ''}`} onClick={() => setActiveTab('drivers')}>👨‍✈️ Tài xế</div>
@@ -154,6 +156,7 @@ function App() {
         {activeTab === 'notifications' && <div style={{ padding: 20, overflowY: 'auto' }}><NotificationManager /></div>}
         {activeTab === 'students' && <div style={{ padding: 20, overflowY: 'auto' }}><StudentManager /></div>}
         {activeTab === 'routes' && <div style={{ padding: 20, overflowY: 'auto' }}><RoutesManager /></div>}
+        {activeTab === 'stops' && <div style={{ padding: '20px', overflowY: 'auto' }}><StopManager /></div>}
         {activeTab === 'buses' && <div style={{ padding: 20, overflowY: 'auto' }}><BusManager /></div>}
         {activeTab === 'drivers' && <div style={{ padding: 20, overflowY: 'auto' }}><DriverManager /></div>}
         {activeTab === 'parents' && <div style={{ padding: 20, overflowY: 'auto' }}><ParentManager /></div>}
