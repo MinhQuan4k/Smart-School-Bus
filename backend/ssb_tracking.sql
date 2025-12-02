@@ -145,6 +145,14 @@ CREATE TABLE notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+-- Tạo Index cho ngày chạy (để tìm lịch hôm nay nhanh hơn)
+CREATE INDEX idx_schedule_date ON schedules(date);
+
+-- Tạo Index cho số điện thoại (để Login nhanh hơn)
+CREATE INDEX idx_user_phone ON users(phone);
+
+-- Tạo Index cho trạng thái điểm danh (để thống kê nhanh hơn)
+CREATE INDEX idx_attendance_status ON trip_attendance(status);
 
 SET FOREIGN_KEY_CHECKS = 1;
 

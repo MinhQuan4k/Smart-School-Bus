@@ -1,27 +1,55 @@
 const { pool } = require("../config/db");
-const { getDistance } = require("../utils/distance"); // Hàm tính Haversine
+const { getDistance } = require("../utils/distance");
 
-// Lưu thời gian lần cuối bắn noti cho mỗi học sinh để tránh spam (1 phút 1 lần)
-const lastNotificationTime = {}; 
+// 1. Biến lưu thời gian lần cuối lưu log của từng chuyến xe
+// Dạng: { 'schedule_1': 17000000, 'schedule_2': 17000020... }
+const lastLogTime = {}; 
+
+// Biến lưu thời gian lần cuối báo tin (như cũ)
+const lastAlertTime = {}; 
 
 module.exports = (io, socket) => {
     socket.on("join_trip", (data) => { socket.join(`trip_${data.schedule_id}`); });
     socket.on("join_room_parent", (data) => { socket.join(`parent_${data.parent_id}`); });
 
-    // Khi Tài xế gửi tọa độ
     socket.on("driver_send_location", async (data) => {
         const { schedule_id, lat, lng, speed } = data;
+        const now = Date.now();
         
-        // 1. Vẽ bản đồ (Real-time)
+        // ===========================================================
+        // A. LUỒNG HIỂN THỊ (REAL-TIME) - LUÔN LUÔN CHẠY
+        // ===========================================================
+        // Bắn ngay lập tức để bản đồ di chuyển mượt mà (2s/lần)
         socket.to(`trip_${schedule_id}`).emit("update_location", { lat, lng, speed });
 
-        // 2. Logic Thông báo "Xe sắp đến Trạm"
+
+        // ===========================================================
+        // B. LUỒNG LƯU TRỮ (DATABASE) - CHỈ LƯU MỖI 10 GIÂY
+        // ===========================================================
+        const lastTimeSaved = lastLogTime[schedule_id] || 0;
+
+        // Nếu đã qua 10 giây (10000ms) kể từ lần lưu trước
+        if (now - lastTimeSaved > 10000) {
+            // Cập nhật thời gian lưu mới nhất
+            lastLogTime[schedule_id] = now;
+
+            // Thực hiện lưu vào DB (Không dùng await để tránh block luồng socket)
+            pool.query(
+                "INSERT INTO location_logs (schedule_id, latitude, longitude, speed) VALUES (?, ?, ?, ?)",
+                [schedule_id, lat, lng, speed || 0]
+            ).catch(err => console.error("Lỗi lưu log:", err.message));
+            
+            console.log(`💾 [DB SAVED] Đã lưu log chuyến ${schedule_id}`);
+        }
+
+
+        // ===========================================================
+        // C. LUỒNG TÍNH TOÁN KHOẢNG CÁCH (LOGIC CŨ)
+        // ===========================================================
         try {
-            // Lấy danh sách học sinh chưa đón + TỌA ĐỘ TRẠM CỦA BÉ ĐÓ
             const sql = `
-                SELECT 
-                    s.student_id, s.parent_id, s.full_name,
-                    st.name as stop_name, st.latitude as stop_lat, st.longitude as stop_lng
+                SELECT s.student_id, s.parent_id, s.full_name,
+                       st.name as stop_name, st.latitude as stop_lat, st.longitude as stop_lng
                 FROM trip_attendance ta
                 JOIN students s ON ta.student_id = s.student_id
                 JOIN stops st ON s.stop_id = st.stop_id
@@ -29,40 +57,20 @@ module.exports = (io, socket) => {
             `;
             const [students] = await pool.query(sql, [schedule_id]);
 
-            students.forEach(student => {
-                // Tính khoảng cách từ Xe đến Trạm
-                const distance = getDistance(lat, lng, student.stop_lat, student.stop_lng);
+            students.forEach(std => {
+                const dist = getDistance(lat, lng, std.stop_lat, std.stop_lng);
                 
-                // Nếu khoảng cách < 500m (Xe sắp tới trạm)
-                if (distance < 500) {
-                    const now = Date.now();
-                    const lastTime = lastNotificationTime[student.student_id] || 0;
-
-                    // Chỉ báo nếu chưa báo trong vòng 5 phút qua (Tránh spam khi kẹt xe gần trạm)
-                    if (now - lastTime > 5 * 60 * 1000) {
-                        
-                        console.log(`🔔 Báo tin cho bé ${student.full_name}: Xe cách trạm ${Math.round(distance)}m`);
-                        
-                        // Gửi Socket riêng cho Phụ huynh
-                        io.to(`parent_${student.parent_id}`).emit("push_notification", {
-                            title: "XE SẮP ĐẾN TRẠM!",
-                            message: `Xe buýt đang cách trạm ${student.stop_name} khoảng ${Math.round(distance)}m. Phụ huynh vui lòng ra đón bé ${student.full_name}.`,
-                            type: 'reminder',
-                            time: new Date()
-                        });
-
-                        // Lưu log thông báo vào DB (Tùy chọn)
-                        pool.query("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'reminder')", 
-                            [student.parent_id, "Xe sắp đến trạm", `Xe cách trạm ${student.stop_name} ${Math.round(distance)}m`]);
-
-                        // Cập nhật thời gian báo
-                        lastNotificationTime[student.student_id] = now;
-                    }
+                // Logic báo tin (giữ nguyên như cũ)
+                if (dist < 500 && (now - (lastAlertTime[std.student_id] || 0) > 300000)) {
+                    io.to(`parent_${std.parent_id}`).emit("push_notification", {
+                        title: "XE SẮP ĐẾN TRẠM!",
+                        message: `Xe buýt đang cách trạm ${std.stop_name} khoảng ${Math.round(dist)}m.`,
+                        type: 'reminder',
+                        time: new Date()
+                    });
+                    lastAlertTime[std.student_id] = now;
                 }
             });
-
-        } catch (e) {
-            console.error("Lỗi tính toán trạm dừng:", e);
-        }
+        } catch (e) { console.error(e); }
     });
 };

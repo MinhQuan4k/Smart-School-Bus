@@ -16,6 +16,7 @@ const io = socketIo(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
+
 // =======================================================
 // 3. MIDDLEWARES (PHẢI NẰM TRÊN CÙNG - TRƯỚC MỌI ROUTE)
 // =======================================================
@@ -28,6 +29,15 @@ app.use(morgan("dev"));
 app.use((req, res, next) => {
     req.io = io;
     next();
+});
+// Rate Limiter
+const rateLimit = require("express-rate-limit");
+
+// Cấu hình bộ giới hạn
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 100, // Tối đa 100 request mỗi IP
+  message: "Bạn đã gửi quá nhiều yêu cầu, vui lòng thử lại sau 15 phút."
 });
 
 // =======================================================
@@ -62,6 +72,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/stops", stopRoutes);
+app.use("/api", limiter);
 
 // =======================================================
 // 5. SERVER START
