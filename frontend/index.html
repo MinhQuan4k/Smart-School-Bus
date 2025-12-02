@@ -3,219 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSB System Demo Simulator</title>
+    <title>SSB System - Demo Simulator</title>
     
-    <!-- Leaflet & Socket -->
+    <!-- Libraries -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #3b82f6;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --bg: #f1f5f9;
-            --card: #ffffff;
-            --text: #334155;
+            --primary: #4f46e5; --primary-hover: #4338ca;
+            --success: #10b981; --success-hover: #059669;
+            --danger: #ef4444; --danger-hover: #dc2626;
+            --warning: #f59e0b; --info: #3b82f6;
+            --bg: #f8fafc; --card: #ffffff; --text: #334155; --border: #e2e8f0;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0; padding: 20px;
+            font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text);
+            margin: 0; padding: 20px; height: 100vh; box-sizing: border-box;
             display: flex; flex-direction: column;
-            height: 100vh; box-sizing: border-box;
         }
 
-        .header { text-align: center; margin-bottom: 20px; }
-        h1 { margin: 0; color: #1e293b; font-weight: 800; letter-spacing: -1px; }
-        .subtitle { color: #64748b; font-size: 0.9rem; }
+        /* HEADER */
+        .header-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; background: white; padding: 15px 25px;
+            border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .brand { font-size: 1.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+        .brand span { color: var(--text); font-weight: 400; font-size: 1rem; }
+        .server-status { font-size: 0.85rem; font-weight: 600; padding: 6px 12px; border-radius: 20px; background: #fee2e2; color: var(--danger); }
+        .server-status.connected { background: #dcfce7; color: #166534; }
 
-        .container { display: flex; gap: 20px; flex: 1; height: 100%; }
+        /* MAIN LAYOUT */
+        .container { display: flex; gap: 20px; flex: 1; overflow: hidden; }
 
         .panel {
-            flex: 1;
-            background: var(--card);
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-            padding: 20px;
-            display: flex; flex-direction: column;
-            overflow: hidden; border: 1px solid #e2e8f0;
+            flex: 1; background: var(--card); border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        .panel-header {
+        .panel-head {
+            padding: 15px 20px; background: #f1f5f9; border-bottom: 1px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 15px;
         }
-        .panel-header h2 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; color: #0f172a; }
-        
-        .status-badge {
-            padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold;
-            background: #e2e8f0; color: #64748b; transition: 0.3s;
-        }
-        .status-badge.online { background: #dcfce7; color: #166534; }
+        .panel-head h2 { margin: 0; font-size: 1.1rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
 
-        /* Controls */
-        .control-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.85rem; color: #475569; }
+        .panel-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+        /* CONTROLS */
+        .control-box {
+            background: #fff; border: 1px solid var(--border);
+            padding: 15px; border-radius: 10px; margin-bottom: 15px;
+        }
+        .label { font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 8px; display: block; }
         
         select, input {
-            width: 100%; padding: 10px;
-            border: 1px solid #cbd5e1; border-radius: 8px;
-            font-size: 0.95rem; margin-bottom: 10px;
-            background-color: #f8fafc; color: #334155; outline: none;
+            width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+            font-size: 0.9rem; outline: none; margin-bottom: 10px;
+            background-image: linear-gradient(to bottom, #ffffff, #f8fafc);
         }
-        select:focus, input:focus { border-color: var(--primary); background: white; }
 
+        /* BUTTONS */
+        .btn-group { display: flex; gap: 10px; }
         button {
-            width: 100%; padding: 12px; border: none; border-radius: 8px;
-            font-weight: 700; cursor: pointer; transition: all 0.2s;
-            font-size: 0.9rem; margin-bottom: 8px;
-            display: flex; justify-content: center; align-items: center; gap: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+            font-size: 0.9rem; display: flex; justify-content: center; align-items: center; gap: 6px;
+            color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        button:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         button:active { transform: translateY(0); }
 
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-warning { background: var(--warning); color: white; }
+        .btn-primary { background: var(--primary); } .btn-primary:hover { background: var(--primary-hover); }
+        .btn-success { background: var(--success); } .btn-success:hover { background: var(--success-hover); }
+        .btn-danger { background: var(--danger); } .btn-danger:hover { background: var(--danger-hover); }
+        .btn-warning { background: var(--warning); } .btn-warning:hover { background: #d97706; }
+        .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); } 
+        .btn-outline:hover { background: #f1f5f9; }
 
-        /* Map */
-        #map { flex: 1; width: 100%; border-radius: 10px; border: 1px solid #cbd5e1; min-height: 250px; }
+        /* SIMULATION ELEMENTS */
+        #map { height: 250px; width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; }
 
-        /* Logs */
-        .log-container {
-            flex: 1; overflow-y: auto;
-            background: #1e293b; color: #10b981;
-            padding: 15px; border-radius: 10px;
-            font-family: 'Courier New', monospace; font-size: 0.85rem;
-            margin-top: 10px; border: 1px solid #0f172a;
+        /* LOGS */
+        .log-window {
+            background: #1e293b; color: #10b981; padding: 15px;
+            border-radius: 8px; font-family: 'Consolas', monospace; font-size: 0.8rem;
+            height: 150px; overflow-y: auto; border: 1px solid #334155;
         }
-        .log-item { margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-        .log-time { color: #94a3b8; font-size: 0.75rem; margin-right: 5px; }
-        .log-alert { color: #f87171; font-weight: bold; }
-        .log-info { color: #60a5fa; }
+        .log-line { margin-bottom: 4px; border-bottom: 1px solid #334155; padding-bottom: 2px; }
+        .log-time { color: #64748b; margin-right: 8px; }
+        .log-err { color: #ef4444; } .log-warn { color: #fbbf24; } .log-sys { color: #38bdf8; }
 
-        /* Notification Box */
-        .notification-box {
-            height: 180px; overflow-y: auto;
-            background: #fffbeb; border: 1px solid #fcd34d;
-            border-radius: 10px; padding: 10px; margin-top: 10px;
+        /* ATTENDANCE LIST */
+        .student-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .student-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc;
         }
-        .noti-item {
-            padding: 10px; background: white; border-radius: 6px;
-            margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            border-left: 4px solid var(--primary); font-size: 0.9rem;
+        .student-info b { display: block; font-size: 0.9rem; }
+        .student-info span { font-size: 0.8rem; color: #64748b; }
+        .student-actions button { padding: 6px 10px; font-size: 0.8rem; width: auto; }
+
+        /* NOTIFICATIONS */
+        .noti-list { height: 180px; overflow-y: auto; }
+        .noti-card {
+            padding: 12px; margin-bottom: 10px; background: white;
+            border-left: 4px solid var(--primary); border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); animation: slideIn 0.3s ease;
         }
-        .noti-item.alert { border-left-color: var(--danger); background: #fef2f2; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1>🚌 SSB SIMULATOR</h1>
-        <div class="subtitle">Giả lập tín hiệu Tài xế & Phụ huynh</div>
+    <div class="header-bar">
+        <div class="brand">🚍 SSB SIMULATOR <span> | Trình giả lập Hệ thống</span></div>
+        <div id="server-status" class="server-status">Connecting...</div>
     </div>
 
     <div class="container">
         
-        <!-- CỘT 1: APP TÀI XẾ -->
+        <!-- PANEL 1: TÀI XẾ -->
         <div class="panel">
-            <div class="panel-header">
-                <h2>👮 Tài xế (Driver)</h2>
-                <span id="driver-status" class="status-badge">🔴 Offline</span>
+            <div class="panel-head">
+                <h2>👮 Giao diện Tài xế</h2>
+                <div style="font-size: 12px; color: #64748b">Driver App</div>
             </div>
-
-            <div class="control-group">
-                <label>1. Chọn Chuyến xe:</label>
-                <div style="display:flex; gap:10px;">
-                    <select id="tripSelect">
-                        <option value="1">Tuyến 01: Q7 - Q1 (Xe 59B-123.45)</option>
-                        <option value="2">Tuyến 02: Tân Bình (Xe 59B-999.99)</option>
-                        <option value="15">Tuyến Demo (Vừa tạo)</option>
-                    </select>
-                    <button class="btn-primary" onclick="joinTripDriver()" style="width: auto;">Kết nối</button>
+            <div class="panel-body">
+                
+                <!-- 1. Kết nối -->
+                <div class="control-box">
+                    <span class="label">1. Cấu hình Chuyến đi</span>
+                    <div style="display:flex; gap:10px;">
+                        <select id="tripSelect">
+                            <option value="1">Tuyến 01: Trung tâm - LHP (Xe 59B-123.45)</option>
+                            <option value="2">Tuyến 02: Tân Bình (Xe 59B-999.99)</option>
+                            <option value="15">Tuyến Demo</option>
+                        </select>
+                        <button class="btn-primary" onclick="joinTripDriver()" style="flex: 0.4;">Kết nối</button>
+                    </div>
                 </div>
-            </div>
 
-            <div class="control-group">
-                <label>2. Điều khiển xe:</label>
-                <button class="btn-success" id="btn-drive" onclick="toggleDrive()">▶️ BẮT ĐẦU CHẠY</button>
-                <div id="drive-status" style="text-align: center; margin-top: 5px; font-size: 0.85rem; color: #64748b; font-style: italic;">Xe đang dừng tại bến</div>
-            </div>
-
-            <div class="control-group">
-                <label>3. Tình huống khẩn cấp (Demo):</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button class="btn-warning" onclick="reportIncident('traffic')">🚦 Kẹt xe</button>
-                    <button class="btn-danger" onclick="reportIncident('breakdown')">🛠️ Hỏng xe</button>
+                <!-- 2. Lái xe -->
+                <div class="control-box">
+                    <span class="label">2. Mô phỏng Lái xe (GPS)</span>
+                    <button class="btn-success" id="btn-drive" onclick="toggleDrive()">▶️ BẮT ĐẦU CHẠY</button>
+                    <div id="drive-status" style="text-align: center; font-size: 0.8rem; color: #64748b; margin-top: 5px;">Xe đang dừng tại bến</div>
                 </div>
-            </div>
 
-            <label>Nhật ký GPS:</label>
-            <div id="driver-log" class="log-container">
-                <div class="log-item">Hệ thống sẵn sàng...</div>
+                <!-- 3. Điểm danh (MỚI) -->
+                <div class="control-box">
+                    <span class="label">3. Điểm danh Học sinh (Test API)</span>
+                    <div class="student-list">
+                        <div class="student-item">
+                            <div class="student-info"><b>Nguyễn Bé Bi</b><span>Trạm: Co.op Mart</span></div>
+                            <div class="student-actions btn-group">
+                                <button class="btn-outline" onclick="simulateAttendance(1, 'picked_up')" style="color:green; border-color:green">Đón</button>
+                                <button class="btn-outline" onclick="simulateAttendance(1, 'dropped_off')" style="color:blue; border-color:blue">Trả</button>
+                            </div>
+                        </div>
+                        <div class="student-item">
+                            <div class="student-info"><b>Trần Bé Bo</b><span>Trạm: CV 23/9</span></div>
+                            <div class="student-actions btn-group">
+                                <button class="btn-outline" onclick="simulateAttendance(2, 'picked_up')" style="color:green; border-color:green">Đón</button>
+                                <button class="btn-outline" onclick="simulateAttendance(2, 'dropped_off')" style="color:blue; border-color:blue">Trả</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Sự cố -->
+                <div class="control-box" style="border-color: #fecaca; background: #fef2f2;">
+                    <span class="label" style="color: #ef4444;">4. Báo cáo Khẩn cấp</span>
+                    <div class="btn-group">
+                        <button class="btn-warning" onclick="reportIncident('traffic')">🚗 Kẹt xe</button>
+                        <button class="btn-danger" onclick="reportIncident('breakdown')">🛠️ Hỏng xe</button>
+                    </div>
+                </div>
+
+                <span class="label">Console Log:</span>
+                <div id="driver-log" class="log-window">
+                    <div class="log-line">System ready...</div>
+                </div>
             </div>
         </div>
 
-        <!-- CỘT 2: APP PHỤ HUYNH -->
+        <!-- PANEL 2: PHỤ HUYNH -->
         <div class="panel">
-            <div class="panel-header">
-                <h2>👨‍👩‍👧 Phụ Huynh (Parent)</h2>
-                <span id="parent-status" class="status-badge">Waiting...</span>
+            <div class="panel-head">
+                <h2>👨‍👩‍👧 Giao diện Phụ huynh</h2>
+                <div style="font-size: 12px; color: #64748b">Parent App</div>
             </div>
-
-            <div class="control-group">
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:1">
-                        <label>Chọn Phụ huynh:</label>
+            <div class="panel-body">
+                
+                <div class="control-box">
+                    <span class="label">Chọn ngữ cảnh theo dõi</span>
+                    <div style="display:flex; gap:10px; margin-bottom: 10px;">
                         <select id="parentSelect">
-                            <option value="4">Mẹ Bé Bi (ID: 4)</option>
-                            <option value="5">Bố Bé Bo (ID: 5)</option>
+                            <option value="3">Mẹ Bé Bi (ID: 3)</option>
+                            <option value="4">Bố Bé Bo (ID: 4)</option>
+                        </select>
+                        <select id="scheduleSelect">
+                            <option value="1">Theo dõi Tuyến 01</option>
+                            <option value="2">Theo dõi Tuyến 02</option>
                         </select>
                     </div>
-                    <div style="flex:1">
-                        <label>Xem chuyến:</label>
-                        <select id="scheduleSelect">
-                            <option value="1">Tuyến 01</option>
-                            <option value="2">Tuyến 02</option>
-                            <option value="15">Tuyến Demo</option>
-                        </select>
+                    <button class="btn-primary" onclick="joinParent()">📡 BẮT ĐẦU THEO DÕI</button>
+                </div>
+
+                <!-- Map -->
+                <div id="map"></div>
+                
+                <div style="margin-top: 20px;">
+                    <span class="label">🔔 Trung tâm Thông báo (Real-time)</span>
+                    <div id="noti-box" class="noti-list">
+                        <div style="text-align: center; color: #94a3b8; margin-top: 20px;">Chưa có thông báo mới</div>
                     </div>
                 </div>
-                <button class="btn-primary" onclick="joinParent()">📡 BẮT ĐẦU THEO DÕI</button>
-            </div>
 
-            <!-- Bản đồ -->
-            <div id="map"></div>
-
-            <!-- Khu vực thông báo -->
-            <h3 style="margin: 15px 0 5px 0; font-size: 0.95rem; color: #334155;">🔔 Thông báo từ nhà trường</h3>
-            <div id="noti-box" class="notification-box">
-                <div style="text-align: center; color: #94a3b8; margin-top: 20px;">Chưa có thông báo mới</div>
             </div>
         </div>
     </div>
 
     <script>
+        // CẤU HÌNH
         const SOCKET_URL = "http://localhost:3000";
-        const socket = io(SOCKET_URL);
+        const API_URL = "http://localhost:3000/api"; // Dùng để gọi API điểm danh
         
+        const socket = io(SOCKET_URL);
         let driveInterval = null;
         let isDriving = false;
+        
+        // Tọa độ giả lập (Quận 1, TP.HCM)
         let currentLat = 10.762622;
         let currentLng = 106.660172;
 
-        // --- CẤU HÌNH BẢN ĐỒ ---
-        const map = L.map('map').setView([currentLat, currentLng], 15);
+        // --- MAP SETUP ---
+        const map = L.map('map').setView([currentLat, currentLng], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM' }).addTo(map);
         
         const busIcon = L.icon({
@@ -224,19 +254,38 @@
         });
         let busMarker = L.marker([currentLat, currentLng], {icon: busIcon}).addTo(map);
 
-        // --- SOCKET CONNECT ---
+        // --- SOCKET EVENTS ---
         socket.on("connect", () => {
-            updateStatus('driver-status', '🟢 Online', 'online');
+            document.getElementById('server-status').innerText = "🟢 Connected";
+            document.getElementById('server-status').className = "server-status connected";
         });
 
-        // --- CHỨC NĂNG TÀI XẾ ---
+        socket.on("disconnect", () => {
+            document.getElementById('server-status').innerText = "🔴 Disconnected";
+            document.getElementById('server-status').className = "server-status";
+        });
+
+        // Nghe vị trí xe
+        socket.on("update_location", (data) => {
+            const { lat, lng, speed } = data;
+            busMarker.setLatLng([lat, lng]);
+            map.panTo([lat, lng]);
+            busMarker.bindPopup(`<b>Xe Buýt</b><br>Tốc độ: ${speed} km/h`).openPopup();
+        });
+
+        // Nghe thông báo
+        socket.on("child_status_change", (data) => addNoti(data.message, data.status === 'picked_up' ? 'success' : 'info'));
+        socket.on("incident_alert", (data) => {
+            addNoti(`🚨 ${data.message}`, 'error');
+            alert(`CẢNH BÁO: ${data.message}`);
+        });
+        socket.on("push_notification", (data) => addNoti(`📩 ${data.title}: ${data.message}`, 'warning'));
+
+        // --- DRIVER ACTIONS ---
         function joinTripDriver() {
-            // Lấy giá trị từ Dropdown
             const id = document.getElementById("tripSelect").value;
-            const text = document.getElementById("tripSelect").options[document.getElementById("tripSelect").selectedIndex].text;
-            
             socket.emit("join_trip", { schedule_id: id });
-            addLog(`Đã kết nối vào: ${text}`, 'info');
+            addLog(`Tài xế joined Room: trip_${id}`, 'sys');
         }
 
         function toggleDrive() {
@@ -250,7 +299,7 @@
                 btn.innerHTML = "▶️ BẮT ĐẦU CHẠY";
                 btn.className = "btn-success";
                 status.innerText = "Xe đang dừng tại bến";
-                addLog("Đã tắt máy xe.", 'info');
+                addLog("Đã tắt máy xe.", 'warn');
             } else {
                 isDriving = true;
                 btn.innerHTML = "🛑 DỪNG XE";
@@ -259,90 +308,84 @@
                 addLog("Bắt đầu lộ trình...", 'info');
 
                 driveInterval = setInterval(() => {
-                    // Giả lập di chuyển ngẫu nhiên
+                    // Giả lập di chuyển
                     currentLat += (Math.random() - 0.3) * 0.0005; 
                     currentLng += (Math.random() - 0.3) * 0.0005;
 
                     socket.emit("driver_send_location", {
-                        schedule_id: id,
-                        lat: currentLat,
-                        lng: currentLng,
+                        schedule_id: id, lat: currentLat, lng: currentLng,
                         speed: Math.floor(Math.random() * 30) + 20
                     });
-                    
-                    addLog(`GPS: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`);
+                    addLog(`GPS Sent: [${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}]`);
                 }, 2000);
             }
         }
 
-        async function reportIncident(type) {
-            const id = document.getElementById("tripSelect").value;
-            const desc = type === 'traffic' ? 'Kẹt xe nghiêm trọng tại ngã tư' : 'Xe bị hỏng động cơ, cần cứu hộ';
+        // Giả lập gọi API Điểm danh (Cần Token thật mới gọi được API, ở đây ta giả lập bằng Socket emit để test UI)
+        // Trong thực tế App sẽ gọi axios.put(...)
+        function simulateAttendance(studentId, status) {
+            const scheduleId = document.getElementById("tripSelect").value;
+            const studentName = studentId === 1 ? "Nguyễn Bé Bi" : "Trần Bé Bo";
+            const msg = status === 'picked_up' ? `Đã đón bé ${studentName} lên xe` : `Đã trả bé ${studentName} an toàn`;
             
+            // Emit socket giả lập sự kiện server bắn về (vì ta không login ở đây)
+            // LƯU Ý: Để test chuẩn nhất, hãy dùng Postman gọi API thật. Ở đây chỉ demo visual.
+            addLog(`[ACTION] ${msg}`, 'info');
+            
+            // Giả vờ Server bắn thông báo cho phụ huynh
+            // (Trong thực tế Backend sẽ làm việc này sau khi update DB)
+            socket.emit("debug_fake_notification", {
+                student_id: studentId,
+                message: msg,
+                status: status
+            });
+            // *Lưu ý: Cần sửa backend để handle event debug này nếu muốn test không cần DB*
+            // HOẶC: Bạn chỉ cần nhìn log ở đây là biết nút bấm hoạt động.
+        }
+
+        function reportIncident(type) {
+            const id = document.getElementById("tripSelect").value;
             socket.emit("driver_report_incident", {
                 schedule_id: id,
                 type: type,
-                description: desc
+                description: "Sự cố được báo cáo từ Simulator"
             });
-            
-            addLog(`⚠️ Đã báo cáo: ${type.toUpperCase()}`, 'alert');
+            addLog(`⚠️ Báo cáo sự cố: ${type}`, 'err');
         }
 
-        // --- CHỨC NĂNG PHỤ HUYNH ---
+        // --- PARENT ACTIONS ---
         function joinParent() {
             const scheduleId = document.getElementById("scheduleSelect").value;
             const parentId = document.getElementById("parentSelect").value;
-            const parentName = document.getElementById("parentSelect").options[document.getElementById("parentSelect").selectedIndex].text;
             
             socket.emit("join_trip", { schedule_id: scheduleId });
-            socket.emit("join_room_parent", { parent_id: parentId }); 
+            socket.emit("join_room_parent", { parent_id: parentId });
             
-            updateStatus('parent-status', '🟢 Tracking...', 'online');
-            document.getElementById("noti-box").innerHTML = ""; 
-            addNoti(`Xin chào ${parentName}. Đang theo dõi chuyến số ${scheduleId}`, 'info');
+            document.getElementById("noti-box").innerHTML = "";
+            addNoti(`Đã kết nối theo dõi chuyến ${scheduleId}`, 'sys');
         }
-
-        // --- LẮNG NGHE SỰ KIỆN ---
-        socket.on("update_location", (data) => {
-            const { lat, lng, speed } = data;
-            busMarker.setLatLng([lat, lng]);
-            map.panTo([lat, lng]);
-            busMarker.bindPopup(`Vận tốc: ${speed} km/h`).openPopup();
-        });
-
-        socket.on("child_status_change", (data) => {
-            const time = new Date(data.time).toLocaleTimeString();
-            addNoti(`[${time}] ${data.message}`, data.status === 'picked_up' ? 'success' : 'info');
-        });
-
-        socket.on("incident_alert", (data) => {
-            const time = new Date(data.time || Date.now()).toLocaleTimeString();
-            addNoti(`[${time}] 🚨 ${data.message}`, 'alert');
-            alert(`CẢNH BÁO: ${data.message}`);
-        });
-
-        socket.on("push_notification", (data) => {
-            addNoti(`📩 TIN NHẮN: ${data.title} - ${data.message}`, 'info');
-        });
 
         // --- UTILS ---
         function addLog(msg, type = '') {
-            const logDiv = document.getElementById("driver-log");
+            const box = document.getElementById("driver-log");
             const time = new Date().toLocaleTimeString();
-            const colorClass = type === 'alert' ? 'log-alert' : (type === 'info' ? 'log-info' : '');
-            logDiv.innerHTML = `<div class="log-item ${colorClass}"><span class="log-time">${time}</span> ${msg}</div>` + logDiv.innerHTML;
+            const colorClass = type === 'err' ? 'log-err' : (type === 'warn' ? 'log-warn' : (type === 'sys' ? 'log-sys' : ''));
+            box.innerHTML = `<div class="log-line ${colorClass}"><span class="log-time">${time}</span>${msg}</div>` + box.innerHTML;
         }
 
         function addNoti(msg, type = 'info') {
             const box = document.getElementById("noti-box");
-            let borderClass = type === 'alert' ? 'alert' : '';
-            box.innerHTML = `<div class="noti-item ${borderClass}">${msg}</div>` + box.innerHTML;
-        }
-
-        function updateStatus(id, text, className) {
-            const el = document.getElementById(id);
-            el.innerText = text;
-            el.className = `status-badge ${className}`;
+            if(box.innerHTML.includes("Chưa có thông báo")) box.innerHTML = "";
+            
+            const color = type === 'success' ? '#10b981' : (type === 'error' ? '#ef4444' : '#3b82f6');
+            const bg = type === 'error' ? '#fef2f2' : 'white';
+            
+            box.innerHTML = `
+                <div class="noti-card" style="border-left-color: ${color}; background: ${bg}">
+                    <div style="font-weight:bold; font-size:0.8rem; color:#94a3b8">${new Date().toLocaleTimeString()}</div>
+                    <div style="color:#334155">${msg}</div>
+                </div>
+            ` + box.innerHTML;
         }
     </script>
 </body>

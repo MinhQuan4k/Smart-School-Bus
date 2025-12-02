@@ -1,31 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import io from 'socket.io-client';
 import axios from 'axios';
 
-// --- CONFIG ICONS ---
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+// --- 1. CẤU HÌNH ICON ---
 
-// 1. Icon Xe Buýt (Hình ảnh sinh động)
-const BusIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
-    iconSize: [45, 45],
-    iconAnchor: [22, 45],
-    popupAnchor: [0, -40]
-});
-
-// 2. Icon Trạm Dừng (Chấm tròn đỏ css thuần - load nhanh)
+// Icon Trạm Dừng (Chấm đỏ gọn gàng)
 const StopIcon = L.divIcon({
   className: 'custom-div-icon',
   html: `<div style="
-    background-color: #ef4444;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid white;
+    background-color: #ef4444; width: 14px; height: 14px;
+    border-radius: 50%; border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   "></div>`,
   iconSize: [14, 14],
@@ -33,48 +20,74 @@ const StopIcon = L.divIcon({
   popupAnchor: [0, -10]
 });
 
-// 3. Fix lỗi icon mặc định của Leaflet trong React
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+// Hàm tạo Icon Xe Buýt có thể XOAY được (Dùng CSS Transform)
+const createRotatedBusIcon = (rotationAngle) => {
+  return L.divIcon({
+    className: 'rotated-bus-icon',
+    html: `<div style="
+      width: 45px; height: 45px;
+      background-image: url('https://cdn-icons-png.flaticon.com/512/3448/3448339.png');
+      background-size: cover;
+      transform: rotate(${rotationAngle - 90}deg); /* -90 để chỉnh đúng hướng mũi xe nếu icon gốc hướng lên */
+      transition: transform 0.5s linear; /* Hiệu ứng xoay mượt */
+    "></div>`,
+    iconSize: [45, 45],
+    iconAnchor: [22, 22], // Tâm xoay ở giữa
+    popupAnchor: [0, -20]
+  });
+};
 
-// Kết nối Socket (1 lần duy nhất)
+// --- 2. HÀM TÍNH TOÁN ---
+
+// Tính góc quay (Bearing) giữa 2 tọa độ GPS
+const toRad = (deg) => (deg * Math.PI) / 180;
+const toDeg = (rad) => (rad * 180) / Math.PI;
+
+const getBearing = (startLat, startLng, destLat, destLng) => {
+  const startLatRad = toRad(startLat);
+  const startLngRad = toRad(startLng);
+  const destLatRad = toRad(destLat);
+  const destLngRad = toRad(destLng);
+
+  const y = Math.sin(destLngRad - startLngRad) * Math.cos(destLatRad);
+  const x = Math.cos(startLatRad) * Math.sin(destLatRad) -
+            Math.sin(startLatRad) * Math.cos(destLatRad) * Math.cos(destLngRad - startLngRad);
+            
+  const brng = Math.atan2(y, x);
+  const deg = toDeg(brng);
+  return (deg + 360) % 360; // Trả về góc 0-360 độ
+};
+
+// Kết nối Socket (1 lần duy nhất ngoài component)
 const socket = io('http://localhost:3000');
 
-// Component phụ: Tự động zoom bản đồ
+// Component phụ: Tự động Zoom
 function ChangeView({ center, bounds }) {
   const map = useMap();
-  
-  // Ưu tiên 1: Nếu có bounds (danh sách trạm), zoom bao quát toàn bộ lộ trình
   if (bounds && bounds.length > 0) {
-    try {
-      // Chỉ zoom 1 lần đầu khi mới load trạm để tránh giật khi xe chạy
-      // (Logic này có thể tùy chỉnh nếu muốn camera luôn bám theo xe)
-      const latLngBounds = L.latLngBounds(bounds);
-      map.fitBounds(latLngBounds, { padding: [50, 50] }); 
-    } catch (e) { /* Bỏ qua lỗi nếu bounds chưa chuẩn */ }
-  } 
-  // Ưu tiên 2: Nếu chưa có lộ trình mà có xe, pan camera tới xe
-  else if (center && Array.isArray(center) && center.length === 2) {
+    try { 
+        const latLngBounds = L.latLngBounds(bounds);
+        map.fitBounds(latLngBounds, { padding: [50, 50] }); 
+    } catch(e){}
+  } else if (center && Array.isArray(center)) {
     map.setView(center);
   }
   return null;
 }
 
 const MapTracking = ({ scheduleId, routeId }) => {
-  const [busPos, setBusPos] = useState(null); // Vị trí xe (null = chưa có tín hiệu)
+  const [busPos, setBusPos] = useState(null);
+  const [rotation, setRotation] = useState(0); // Góc quay của xe
   const [speed, setSpeed] = useState(0);
-  const [stops, setStops] = useState([]);     // Danh sách trạm
-  const [routePath, setRoutePath] = useState([]); // Đường vẽ nối các trạm
+  
+  const [stops, setStops] = useState([]);     
+  const [routePath, setRoutePath] = useState([]); 
   const [loadingRoute, setLoadingRoute] = useState(false);
   
   const token = localStorage.getItem('token');
+  const prevPosRef = useRef(null); // Lưu vị trí cũ để tính góc
 
-  // 1. Lấy dữ liệu TRẠM & LỘ TRÌNH (Chạy khi routeId thay đổi)
+  // 1. Tải Lộ Trình (Polyline + Stops)
   useEffect(() => {
     if (routeId) {
       setLoadingRoute(true);
@@ -85,46 +98,50 @@ const MapTracking = ({ scheduleId, routeId }) => {
         if (res.data.success) {
           const stopList = res.data.data;
           setStops(stopList);
-          // Tạo mảng tọa độ [lat, lng] để vẽ đường Polyline
           const path = stopList.map(s => [parseFloat(s.latitude), parseFloat(s.longitude)]);
           setRoutePath(path);
         }
       })
-      .catch(err => console.error("Lỗi tải lộ trình:", err))
+      .catch(err => console.error("Lỗi tải lộ trình"))
       .finally(() => setLoadingRoute(false));
     } else {
-      // Nếu không có routeId (xe chưa gán tuyến), reset trạm
-      setStops([]);
-      setRoutePath([]);
+      setStops([]); setRoutePath([]);
     }
   }, [routeId, token]);
 
-  // 2. Real-time Tracking Xe (Chạy khi scheduleId thay đổi)
+  // 2. Real-time Tracking (Vị trí + Góc quay)
   useEffect(() => {
     if (!scheduleId) return;
 
-    // Tham gia phòng Socket
     socket.emit('join_trip', { schedule_id: scheduleId });
 
-    // Hàm xử lý khi nhận tọa độ mới
     const handleLocationUpdate = (data) => {
       if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
+        
+        // Logic tính góc quay
+        if (prevPosRef.current) {
+            const prev = prevPosRef.current;
+            // Chỉ tính góc nếu xe di chuyển một khoảng đáng kể (tránh rung lắc khi đứng yên)
+            if (Math.abs(data.lat - prev[0]) > 0.00001 || Math.abs(data.lng - prev[1]) > 0.00001) {
+                const angle = getBearing(prev[0], prev[1], data.lat, data.lng);
+                setRotation(angle);
+            }
+        }
+        
+        // Cập nhật vị trí mới
         setBusPos([data.lat, data.lng]);
         setSpeed(data.speed || 0);
+        
+        // Lưu vị trí hiện tại làm vị trí cũ cho lần sau
+        prevPosRef.current = [data.lat, data.lng];
       }
     };
 
-    // Hàm xử lý khi có báo cáo sự cố
-    const handleIncident = (data) => {
-      // Hiển thị thông báo trình duyệt (Browser Alert) hoặc Toast
-      alert(`🚨 CẢNH BÁO TỪ TÀI XẾ:\n${data.message}`);
-    };
+    const handleIncident = (data) => alert(`🚨 SỰ CỐ: ${data.message}`);
 
-    // Đăng ký sự kiện
     socket.on('update_location', handleLocationUpdate);
     socket.on('incident_alert', handleIncident);
 
-    // Dọn dẹp khi thoát
     return () => {
       socket.off('update_location', handleLocationUpdate);
       socket.off('incident_alert', handleIncident);
@@ -134,98 +151,55 @@ const MapTracking = ({ scheduleId, routeId }) => {
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #ddd' }}>
       
-      {/* MAP CONTAINER */}
-      <MapContainer 
-        center={[10.762622, 106.660172]} // Tọa độ mặc định HCM
-        zoom={13} 
-        style={{ height: '100%', width: '100%' }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; OpenStreetMap contributors'
-        />
+      <MapContainer center={[10.762622, 106.660172]} zoom={13} style={{ height: '100%', width: '100%' }}>
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
         
-        {/* LỚP 1: VẼ LỘ TRÌNH (Đường nối các trạm) */}
-        {routePath.length > 0 && (
-          <Polyline 
-            positions={routePath} 
-            color="#3b82f6" // Màu xanh dương hiện đại
-            weight={6}      // Độ dày nét
-            opacity={0.6}   // Độ mờ
-            dashArray="10, 10" // Nét đứt
-          />
-        )}
+        {/* LỘ TRÌNH (Đường xanh) */}
+        {routePath.length > 0 && <Polyline positions={routePath} color="#3b82f6" weight={6} opacity={0.6} dashArray="10, 10" />}
 
-        {/* LỚP 2: CÁC TRẠM DỪNG */}
+        {/* CÁC TRẠM DỪNG */}
         {stops.map((s, index) => (
           <Marker key={s.stop_id} position={[s.latitude, s.longitude]} icon={StopIcon}>
-            <Popup>
-              <div style={{textAlign: 'center'}}>
-                <b style={{color: '#ef4444'}}>🚏 Trạm số {index + 1}</b><br/>
-                {s.name}
-              </div>
-            </Popup>
+            <Popup><div style={{textAlign: 'center'}}><b style={{color: '#ef4444'}}>🚏 Trạm {index + 1}</b><br/>{s.name}</div></Popup>
           </Marker>
         ))}
 
-        {/* LỚP 3: XE BUÝT (Chỉ hiện khi có tín hiệu) */}
+        {/* XE BUÝT (Xoay theo hướng) */}
         {busPos && (
-          <Marker position={busPos} icon={BusIcon} zIndexOffset={1000}>
+          <Marker position={busPos} icon={createRotatedBusIcon(rotation)} zIndexOffset={1000}>
             <Popup>
               <div style={{textAlign:'center'}}>
-                <b style={{color: '#2563eb', fontSize: '14px'}}>🚌 Đang di chuyển</b>
-                <div style={{marginTop: '5px'}}>
-                  Vận tốc: <b>{speed} km/h</b>
-                </div>
+                <b style={{color: '#2563eb'}}>🚌 Đang chạy</b><br/>
+                Vận tốc: {speed} km/h
               </div>
             </Popup>
           </Marker>
         )}
 
-        {/* Tự động điều chỉnh khung nhìn */}
         <ChangeView center={busPos} bounds={routePath.length > 0 ? routePath : null} />
-      
       </MapContainer>
       
-      {/* BẢNG CHÚ THÍCH (LEGEND) */}
+      {/* LEGEND */}
       <div style={{
         position: 'absolute', top: 10, right: 10, 
-        background: 'rgba(255, 255, 255, 0.95)', padding: '12px', 
-        borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', 
-        zIndex: 999, fontSize: '12px', border: '1px solid #e2e8f0'
+        background: 'rgba(255, 255, 255, 0.95)', padding: '10px', borderRadius: '8px', 
+        boxShadow: '0 4px 15px rgba(0,0,0,0.1)', zIndex: 999, fontSize: '12px', border: '1px solid #eee'
       }}>
-        <div style={{fontWeight: 'bold', marginBottom: '8px', color: '#334155'}}>🗺️ Chú thích</div>
-        <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px'}}>
-          <div style={{width: 20, height: 4, background: '#3b82f6', borderRadius: 2}}></div>
-          <span>Lộ trình ({loadingRoute ? 'Đang tải...' : `${stops.length} trạm`})</span>
-        </div>
-        <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px'}}>
-          <div style={{width: 10, height: 10, background: '#ef4444', borderRadius: '50%', border: '1px solid white', boxShadow: '0 0 2px black'}}></div>
-          <span>Điểm dừng đón/trả</span>
-        </div>
-        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-          <span style={{fontSize: '16px'}}>🚌</span>
-          <span>Vị trí xe hiện tại</span>
-        </div>
+        <div style={{fontWeight:'bold', marginBottom:5}}>🗺️ Chú thích</div>
+        <div style={{display:'flex', gap:5, marginBottom:3}}><span style={{color:'#3b82f6'}}>➖</span> Lộ trình ({stops.length} trạm)</div>
+        <div style={{display:'flex', gap:5, marginBottom:3}}>🔴 Trạm dừng</div>
+        <div style={{display:'flex', gap:5}}>🚌 Vị trí xe</div>
       </div>
 
-      {/* TRẠNG THÁI KẾT NỐI */}
+      {/* WAITING STATUS */}
       {!busPos && (
         <div style={{
           position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 16px', borderRadius: '20px',
-          fontSize: '12px', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '5px'
+          background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 15px', borderRadius: '20px', fontSize: '12px', zIndex: 1000
         }}>
-          <div className="spinner" style={{width: 10, height: 10, border: '2px solid white', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
-          <span>Đang chờ tín hiệu GPS từ xe...</span>
+          📡 Đang chờ tín hiệu GPS...
         </div>
       )}
-
-      {/* CSS Animation cho Spinner */}
-      <style>{`
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      `}</style>
-
     </div>
   );
 };
