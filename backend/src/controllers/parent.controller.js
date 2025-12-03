@@ -6,7 +6,7 @@ exports.getBusLocation = async (req, res, next) => {
         const { student_id } = req.params;
         const parentId = req.user.id;
 
-        // A. Kiểm tra xem học sinh này có đúng là con của phụ huynh đang login không?
+        // A. Kiểm tra quyền phụ huynh (Giữ nguyên)
         const [checkChild] = await pool.query(
             "SELECT student_id FROM students WHERE student_id = ? AND parent_id = ?",
             [student_id, parentId]
@@ -15,18 +15,23 @@ exports.getBusLocation = async (req, res, next) => {
             return res.status(403).json({ error: "Bạn không có quyền xem thông tin học sinh này." });
         }
 
-        // B. Tìm chuyến xe MỚI NHẤT mà học sinh này đang tham gia trong ngày hôm nay
-        // Logic: Tìm trong trip_attendance -> join schedules -> lấy tọa độ mới nhất
+        // B. Tìm chuyến xe MỚI NHẤT (CẬP NHẬT SQL ĐỂ LẤY TỌA ĐỘ TRẠM)
         const sql = `
             SELECT 
                 s.schedule_id, s.status as trip_status,
                 b.license_plate, b.brand,
                 u.full_name as driver_name, u.phone as driver_phone,
-                -- Lấy tọa độ mới nhất
+                st_stop.name as stop_name,         -- Tên trạm đón
+                st_stop.latitude as stop_lat,      -- Vĩ độ trạm
+                st_stop.longitude as stop_lng,     -- Kinh độ trạm
+                
+                -- Lấy tọa độ xe mới nhất từ log
                 (SELECT latitude FROM location_logs WHERE schedule_id = s.schedule_id ORDER BY log_id DESC LIMIT 1) as lat,
                 (SELECT longitude FROM location_logs WHERE schedule_id = s.schedule_id ORDER BY log_id DESC LIMIT 1) as lng,
                 (SELECT speed FROM location_logs WHERE schedule_id = s.schedule_id ORDER BY log_id DESC LIMIT 1) as speed
             FROM trip_attendance ta
+            JOIN students st ON ta.student_id = st.student_id
+            LEFT JOIN stops st_stop ON st.stop_id = st_stop.stop_id  -- Join thêm bảng Stops
             JOIN schedules s ON ta.schedule_id = s.schedule_id
             JOIN buses b ON s.bus_id = b.bus_id
             JOIN users u ON s.driver_id = u.user_id
@@ -48,7 +53,6 @@ exports.getBusLocation = async (req, res, next) => {
         next(err);
     }
 };
-
 // 2. Lấy thông báo riêng của phụ huynh
 exports.getNotifications = async (req, res, next) => {
     try {

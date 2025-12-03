@@ -9,4 +9,5 @@ router.get("/", scheduleController.list);
 router.post("/", scheduleController.create);
 router.post("/", verifyToken, isAdmin, scheduleController.create);
 router.get("/driver/me", verifyToken, scheduleController.getMySchedules);
+router.get("/:id/students", verifyToken, scheduleController.getScheduleStudents);
 module.exports = router;

@@ -40,3 +40,12 @@
 .read-the-docs {
   color: #888;
 }
+.menu-group-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #64748b;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  padding-left: 10px;
+  letter-spacing: 1px;
+}

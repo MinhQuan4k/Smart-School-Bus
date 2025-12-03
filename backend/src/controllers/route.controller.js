@@ -1,4 +1,5 @@
 const routeModel = require("../models/route.model");
+const { pool } = require("../config/db"); 
 
 exports.list = async (req, res, next) => {
     try {
@@ -9,7 +10,7 @@ exports.list = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
     try {
-
+        // Lấy thêm estimated_duration từ body
         const { route_name, start_point, end_point, estimated_duration } = req.body;
         
         const newId = await routeModel.createRoute({ 
@@ -38,7 +39,8 @@ exports.delete = async (req, res, next) => {
         res.json({ success: true, message: "Đã xóa tuyến đường" });
     } catch (err) { next(err); }
 };
-//Lấy chi tiết các trạm của 1 tuyến
+
+// API Mới: Lấy chi tiết các trạm của 1 tuyến
 exports.getRouteDetails = async (req, res, next) => {
     try {
         const { id } = req.params; // route_id
@@ -51,6 +53,8 @@ exports.getRouteDetails = async (req, res, next) => {
             WHERE rs.route_id = ?
             ORDER BY rs.order_index ASC
         `;
+        
+        // Bây giờ biến 'pool' đã được import nên sẽ chạy tốt
         const [stops] = await pool.query(sql, [id]);
         
         res.json({ success: true, data: stops });

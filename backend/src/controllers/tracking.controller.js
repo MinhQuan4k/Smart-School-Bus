@@ -4,59 +4,53 @@ const { pool } = require("../config/db");
 exports.updateAttendance = async (req, res, next) => {
     try {
         const { schedule_id, student_id, status } = req.body;
-        // status nên là: 'picked_up' (Đã đón) hoặc 'dropped_off' (Đã trả)
+        // status: 'picked_up' | 'dropped_off'
 
-        // 1. Cập nhật vào Database (Lưu giờ giấc)
-        // Nếu status là 'picked_up' -> cập nhật pickup_time
-        // Nếu status là 'dropped_off' -> cập nhật dropoff_time
-        let timeColumn = status === 'picked_up' ? 'pickup_time' : 'dropoff_time';
+        // 1. Cập nhật vào Database
+        // Nếu đón -> update pickup_time, Nếu trả -> update dropoff_time
+        const timeCol = status === 'picked_up' ? 'pickup_time' : 'dropoff_time';
         
         const sql = `
             UPDATE trip_attendance 
-            SET status = ?, ${timeColumn} = NOW() 
+            SET status = ?, ${timeCol} = NOW() 
             WHERE schedule_id = ? AND student_id = ?
         `;
 
         const [result] = await pool.query(sql, [status, schedule_id, student_id]);
 
-        if (result.affectedRows === 0) {
-            // Nếu không update được (có thể chưa có dòng trong bảng trip_attendance)
-            // Ta chèn mới vào (dự phòng)
-            await pool.query(
-                `INSERT INTO trip_attendance (schedule_id, student_id, status, ${timeColumn}) VALUES (?, ?, ?, NOW())`,
-                [schedule_id, student_id, status]
-            );
-        }
-
-        // 2. Tìm Phụ huynh của bé này để báo tin
-        const [rows] = await pool.query("SELECT parent_id, full_name FROM students WHERE student_id = ?", [student_id]);
+        // 2. Tìm thông tin để báo cho Phụ huynh
+        const [rows] = await pool.query(
+            "SELECT s.parent_id, s.full_name FROM students s WHERE s.student_id = ?", 
+            [student_id]
+        );
         
         if (rows.length > 0) {
-            const studentName = rows[0].full_name;
-            const parentId = rows[0].parent_id;
+            const { parent_id, full_name } = rows[0];
             
-            // 3. BẮN SOCKET CHO RIÊNG PHỤ HUYNH ĐÓ
+            // 3. BẮN SOCKET CHO PHỤ HUYNH
             const message = status === 'picked_up' 
-                ? `Học sinh ${studentName} đã lên xe.` 
-                : `Học sinh ${studentName} đã về đến nhà.`;
+                ? `Học sinh ${full_name} đã lên xe.` 
+                : `Học sinh ${full_name} đã xuống xe an toàn.`;
 
-            req.io.to(`parent_${parentId}`).emit("child_status_change", {
-                student_id,
-                status,
-                message,
-                time: new Date()
-            });
-            
-            console.log(`>> Đã báo tin cho Phụ huynh ID ${parentId}: ${message}`);
+            if (req.io) {
+                req.io.to(`parent_${parent_id}`).emit("child_status_change", {
+                    student_id,
+                    status,
+                    message,
+                    time: new Date()
+                });
+                console.log(`>> Đã báo tin cho Phụ huynh ID ${parent_id}: ${message}`);
+            }
         }
 
-        res.json({ success: true, message: "Cập nhật điểm danh thành công!" });
+        res.json({ success: true, message: "Đã cập nhật điểm danh" });
 
     } catch (err) {
         next(err);
     }
 };
-// API lấy toàn bộ log vị trí của 1 chuyến xe
+
+// (Nếu bạn có hàm xem lịch sử thì thêm vào đây luôn)
 exports.getTripHistory = async (req, res, next) => {
     try {
         const { schedule_id } = req.params;
