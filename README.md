@@ -1,34 +1,106 @@
-🚍 Smart School Bus (SSB) - Hệ thống Giám sát Xe Buýt Học sinh
+🚍 Smart School Bus (SSB) - Hệ Thống Quản Lý & Giám Sát Xe Buýt Học Sinh
 
-Dự án quản lý và theo dõi xe buýt đưa đón học sinh theo thời gian thực (Real-time Tracking), bao gồm Backend API và Web Admin Dashboard.
+Đồ án Tốt nghiệp / Bài tập lớn > Hệ thống quản lý vận tải hành khách thông minh dành cho trường học, tích hợp định vị GPS thời gian thực (Real-time Tracking) và thông báo tự động.
 
-📂 Cấu trúc dự án
+📖 Giới thiệu
 
-ssb_backend/: Server Node.js + Express + MySQL + Socket.io.
+Smart School Bus (SSB) là giải pháp công nghệ giúp giải quyết bài toán an toàn trong việc đưa đón học sinh. Hệ thống kết nối 3 đối tượng: Nhà trường (Quản lý), Tài xế và Phụ huynh thông qua nền tảng Web và Mobile.
 
-ssb_admin/: Web Admin Dashboard (ReactJS + Vite + Leaflet Map).
+✨ Tính năng nổi bật
 
-test_client/: File HTML giả lập App Tài xế (nằm trong backend).
+🗺️ Giám sát lộ trình thực (Live Tracking): Xem vị trí xe di chuyển mượt mà trên bản đồ.
+
+🔔 Thông báo tức thì: Phụ huynh nhận tin nhắn ngay khi con lên/xuống xe hoặc xe sắp đến trạm.
+
+📅 Phân công lịch trình thông minh: Tự động tạo lịch chạy, quản lý đội xe và tài xế.
+
+🚨 Cảnh báo sự cố: Tài xế báo cáo tắc đường/hỏng xe chỉ với 1 chạm.
+
+📊 Báo cáo tự động: Xuất danh sách điểm danh ra file Excel.
+
+🛠️ Công nghệ sử dụng
+
+Thành phần
+
+Công nghệ
+
+Chi tiết kỹ thuật
+
+Backend
+
+Node.js
+
+Express Framework, RESTful API
+
+Database
+
+MySQL
+
+Quan hệ (Relational), Indexing tối ưu
+
+Real-time
+
+Socket.io
+
+WebSocket cho Tracking & Notification
+
+Frontend (Admin)
+
+ReactJS
+
+Vite, Tailwind/CSS Modules, Axios
+
+Maps
+
+Leaflet
+
+OpenStreetMap, Custom Markers, Polyline
+
+Security
+
+JWT
+
+JSON Web Token, Bcrypt Hashing
+
+📂 Cấu trúc thư mục
+
+Smart-School-Bus/
+├── ssb_backend/        # Server Node.js (API & Socket)
+│   ├── src/
+│   │   ├── config/     # Kết nối Database
+│   │   ├── controllers/# Logic xử lý
+│   │   ├── models/     # Truy vấn SQL
+│   │   ├── routes/     # Định nghĩa API
+│   │   └── sockets/    # Xử lý Real-time
+│   ├── server.js       # File khởi chạy
+│   └── test_client/    # Trình giả lập App (Simulator)
+│
+├── ssb_admin/          # Web Admin (ReactJS)
+│   ├── src/
+│   │   ├── components/ # Các màn hình chức năng
+│   │   └── App.jsx     # Điều hướng chính
+│   └── package.json
+│
+└── ssb_mobile/         # (Optional) Source code App Mobile
+
 
 🚀 Hướng dẫn Cài đặt & Chạy
 
-1. Chuẩn bị Cơ sở dữ liệu (MySQL)
+Bước 1: Chuẩn bị Cơ sở dữ liệu
 
-Mở XAMPP, bật module MySQL.
+Cài đặt XAMPP và bật module MySQL.
 
 Truy cập http://localhost/phpmyadmin.
 
-Tạo database tên: ssb_bus_tracking.
+Tạo database mới tên: ssb_bus_tracking.
 
-Import file SQL (hoặc chạy script tạo bảng) vào database này.
+Import file SQL: ssb_full_final.sql (Nằm trong thư mục tài liệu hoặc do tác giả cung cấp).
 
-Quan trọng: Đảm bảo trong bảng users đã có tài khoản Admin (SĐT: admin, Pass: 123).
-
-2. Khởi động Backend (Server)
+Bước 2: Khởi chạy Backend (Server)
 
 Mở Terminal tại thư mục ssb_backend:
 
-# Cài đặt thư viện (chỉ làm lần đầu)
+# Cài đặt thư viện (lần đầu)
 npm install
 
 # Chạy Server
@@ -38,11 +110,11 @@ npm run dev
 
 Server sẽ chạy tại: http://localhost:3000
 
-3. Khởi động Web Admin
+Bước 3: Khởi chạy Web Admin (Frontend)
 
 Mở Terminal mới tại thư mục ssb_admin:
 
-# Cài đặt thư viện (chỉ làm lần đầu)
+# Cài đặt thư viện (lần đầu)
 npm install
 
 # Chạy Web
@@ -51,54 +123,82 @@ npm run dev
 
 Web sẽ chạy tại: http://localhost:5173
 
-4. Giả lập Xe chạy (Mobile App Simulator)
+🎮 Hướng dẫn Demo (Kịch bản kiểm thử)
 
-Vào thư mục ssb_backend/test_client.
+Để thấy toàn bộ sức mạnh của hệ thống, hãy thực hiện theo kịch bản sau:
 
-Mở file index.html bằng trình duyệt.
+1. Đăng nhập Quản trị viên
 
-Nhập ID chuyến xe và bấm "Bắt đầu lái xe" để gửi tọa độ GPS về Server.
+Truy cập Web Admin.
 
-🔑 Tài khoản Demo (Mật khẩu mặc định: 123)
+Tài khoản: admin / Mật khẩu: 123.
+
+Vào menu "📅 Phân công Lịch" -> Tạo một chuyến xe cho ngày hôm nay.
+
+2. Kích hoạt Xe chạy (Giả lập Tài xế)
+
+Mở trình duyệt mới, truy cập file: ssb_backend/test_client/index.html.
+
+Tại cột Tài xế: Chọn chuyến xe vừa tạo -> Bấm Kết nối -> Bấm ▶️ BẮT ĐẦU CHẠY.
+
+Quan sát: Trên Web Admin (Menu Giám sát), xe sẽ bắt đầu di chuyển trên bản đồ.
+
+3. Theo dõi & Điểm danh (Giả lập Phụ huynh)
+
+Tại file index.html, cột Phụ huynh: Chọn tên phụ huynh -> Bấm BẮT ĐẦU THEO DÕI.
+
+Tại cột Tài xế: Bấm nút "Đón" bên cạnh tên học sinh.
+
+Kết quả: Phụ huynh nhận được thông báo "🔔 Học sinh đã lên xe" ngay lập tức.
+
+4. Báo cáo Sự cố
+
+Tài xế bấm nút "🚗 Kẹt xe".
+
+Admin và Phụ huynh đều nhận được cảnh báo đỏ "🚨 SỰ CỐ GIAO THÔNG".
+
+🔑 Danh sách Tài khoản Demo (Mật khẩu: 123)
 
 Vai trò
 
+Tên hiển thị
+
 SĐT Đăng nhập
 
-Quyền hạn
+ADMIN
 
-Admin
+Admin Quản Trị
 
 admin
 
-Quản lý toàn bộ, Tạo lịch, Xem bản đồ
+TÀI XẾ
 
-Tài xế
+Tài xế Tuấn
 
 0901111111
 
-Xem lịch chạy, Điểm danh
+TÀI XẾ
 
-Phụ huynh
+Tài xế Hùng
+
+0902222222
+
+PHỤ HUYNH
+
+Chị Lan (Mẹ Bé Bi)
 
 0903333333
 
-Xem vị trí con, Nhận thông báo
+PHỤ HUYNH
 
-🛠️ Công nghệ sử dụng
+Anh Minh (Bố Bé Bo)
 
-Backend: Node.js, Express, MySQL2, Socket.io, JWT Auth.
+0904444444
 
-Frontend: ReactJS (Vite), Axios, React-Leaflet (Bản đồ), CSS Modules.
+📞 Liên hệ & Hỗ trợ
 
-Real-time: Socket.io (WebSocket).
+Tác giả: [Tên Của Bạn]
 
-📝 Các API chính (Postman)
+Email: [Email Của Bạn]
 
-Auth: POST /api/auth/login
-
-Lịch trình: GET /api/schedules, POST /api/schedules
-
-Vị trí (Tracking): Socket Event driver_send_location
-
-Điểm danh: POST /api/tracking/attendance
+Phiên bản: 1.0.0 (MVP Release)
