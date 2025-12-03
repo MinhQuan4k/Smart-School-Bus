@@ -27,5 +27,23 @@ async function deleteRoute(id) {
     const [result] = await pool.query("DELETE FROM routes WHERE route_id = ?", [id]);
     return result.affectedRows;
 }
+// Thêm trạm vào tuyến
+async function addStopToRoute({ route_id, stop_id, order_index, minutes_from_start }) {
+    const [result] = await pool.query(
+        "INSERT INTO route_stops (route_id, stop_id, order_index, minutes_from_start) VALUES (?, ?, ?, ?)",
+        [route_id, stop_id, order_index, minutes_from_start]
+    );
+    return result.insertId;
+}
 
-module.exports = { getAllRoutes, createRoute, updateRoute, deleteRoute };
+// Xóa trạm khỏi tuyến
+async function removeStopFromRoute(route_id, stop_id) {
+    const [result] = await pool.query(
+        "DELETE FROM route_stops WHERE route_id = ? AND stop_id = ?",
+        [route_id, stop_id]
+    );
+    return result.affectedRows;
+}
+
+
+module.exports = { getAllRoutes, createRoute, updateRoute, deleteRoute , addStopToRoute, removeStopFromRoute};

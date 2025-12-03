@@ -41,7 +41,7 @@ exports.register = async (req, res, next) => {
     }
 };
 
-// --- ĐĂNG NHẬP (Đã sửa lỗi Crash) ---
+// --- ĐĂNG NHẬP  ---
 exports.login = async (req, res, next) => {
     try {
         const { phone, password } = req.body;

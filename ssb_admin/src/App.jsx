@@ -9,11 +9,14 @@ import DriverManager from './components/DriverManager';
 import ParentManager from './components/ParentManager';
 import ScheduleManager from './components/ScheduleManager';
 import NotificationManager from './components/NotificationManager';
+import StopManager from './components/StopManager'; // <--- 1. Import Mới
 
+// Giao diện người dùng khác
 import DriverDashboard from './components/DriverDashboard';
 import ParentDashboard from './components/ParentDashboard';
 
 function App() {
+  // 1. Khởi tạo State
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   
   // Lấy thông tin User an toàn
@@ -25,10 +28,14 @@ function App() {
   });
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Dữ liệu Dashboard
   const [schedules, setSchedules] = useState([]); 
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [error, setError] = useState(null);
 
+  // --- HÀM LOGIC CHUNG ---
+  
   const handleLoginSuccess = (newToken) => {
     setToken(newToken);
     const savedUser = JSON.parse(localStorage.getItem('user'));
@@ -51,7 +58,8 @@ function App() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `BaoCao_DiemDanh_${new Date().toLocaleDateString()}.xlsx`);
+      const dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+      link.setAttribute('download', `BaoCao_DiemDanh_${dateStr}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -80,7 +88,7 @@ function App() {
     }
   }, [token, activeTab, user]);
 
-  // --- 1. MÀN HÌNH LOGIN ---
+  // --- 1. CHƯA ĐĂNG NHẬP -> HIỆN LOGIN ---
   if (!token || !user) {
     return (
       <div className="login-container">
@@ -91,16 +99,18 @@ function App() {
     );
   }
 
-  // --- 2. PHÂN QUYỀN ---
+  // --- 2. PHÂN QUYỀN (ROUTER) ---
+
   if (user.role === 'driver') return <DriverDashboard user={user} onLogout={handleLogout} />;
   if (user.role === 'parent') return <ParentDashboard user={user} onLogout={handleLogout} />;
-  
+
   // Chặn nếu không phải Admin
   if (user.role !== 'admin') {
     return (
       <div style={{height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'}}>
-        <h1>🚫 403 Forbidden</h1>
-        <button onClick={handleLogout}>Đăng xuất</button>
+        <h1 style={{fontSize: 50}}>🚫 403</h1>
+        <h3>Bạn không có quyền truy cập trang Quản Trị!</h3>
+        <button onClick={handleLogout} style={{marginTop: 20, padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: 5, cursor: 'pointer'}}>Đăng xuất</button>
       </div>
     );
   }
@@ -108,34 +118,63 @@ function App() {
   // --- 3. GIAO DIỆN ADMIN ---
   return (
     <div className="app-container">
+      
+      {/* SIDEBAR ADMIN */}
       <div className="sidebar">
         <div className="brand">🚍 SSB Admin</div>
+        
+        {/* Nhóm Điều Hành */}
         <div className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>📊 Giám sát (Live)</div>
         <div className={`menu-item ${activeTab === 'schedule_create' ? 'active' : ''}`} onClick={() => setActiveTab('schedule_create')}>📅 Phân công Lịch</div>
         <div className={`menu-item ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>🔔 Gửi Thông báo</div>
-        <div style={{height: 1, background: '#334155', margin: '10px 0'}}></div>
+        
+        <div style={{height: 1, backgroundColor: '#334155', margin: '10px 0'}}></div>
+
+        {/* Nhóm Hạ Tầng */}
         <div className={`menu-item ${activeTab === 'routes' ? 'active' : ''}`} onClick={() => setActiveTab('routes')}>🛣️ Tuyến đường</div>
-        <div className={`menu-item ${activeTab === 'students' ? 'active' : ''}`} onClick={() => setActiveTab('students')}>🎓 Học sinh</div>
+        
+        {/* 2. Thêm Menu Trạm vào đây */}
+        <div className={`menu-item ${activeTab === 'stops' ? 'active' : ''}`} onClick={() => setActiveTab('stops')}>🚏 Trạm Dừng</div>
+
         <div className={`menu-item ${activeTab === 'buses' ? 'active' : ''}`} onClick={() => setActiveTab('buses')}>🚌 Quản lý Xe</div>
+
+        {/* Nhóm Con Người */}
+        <div className={`menu-item ${activeTab === 'students' ? 'active' : ''}`} onClick={() => setActiveTab('students')}>🎓 Học sinh</div>
         <div className={`menu-item ${activeTab === 'drivers' ? 'active' : ''}`} onClick={() => setActiveTab('drivers')}>👨‍✈️ Tài xế</div>
         <div className={`menu-item ${activeTab === 'parents' ? 'active' : ''}`} onClick={() => setActiveTab('parents')}>👨‍👩‍👧 Phụ huynh</div>
+        
         <button className="logout-btn" onClick={handleLogout}>Đăng xuất</button>
       </div>
 
+      {/* MAIN CONTENT */}
       <div className="main-content">
         <div className="top-bar">
-          <h2>QUẢN TRỊ HỆ THỐNG</h2>
+          <h2>
+            {activeTab === 'dashboard' && 'Dashboard Giám Sát'}
+            {activeTab === 'schedule_create' && 'Phân công Lịch trình'}
+            {activeTab === 'notifications' && 'Gửi Thông báo'}
+            {activeTab === 'routes' && 'Quản lý Tuyến đường'}
+            {activeTab === 'stops' && 'Quản lý Trạm Dừng'}
+            {activeTab === 'students' && 'Quản lý Học sinh'}
+            {activeTab === 'buses' && 'Quản lý Đội Xe'}
+            {activeTab === 'drivers' && 'Quản lý Tài Xế'}
+            {activeTab === 'parents' && 'Quản lý Phụ Huynh'}
+          </h2>
           {error && <span style={{color:'red', marginLeft: 10}}>⚠️ {error}</span>}
           <div style={{color: '#64748b'}}>Admin: {user.full_name}</div>
         </div>
 
-        {activeTab === 'schedule_create' && <div style={{ padding: 20, overflowY: 'auto' }}><ScheduleManager /></div>}
-        {activeTab === 'notifications' && <div style={{ padding: 20, overflowY: 'auto' }}><NotificationManager /></div>}
-        {activeTab === 'students' && <div style={{ padding: 20, overflowY: 'auto' }}><StudentManager /></div>}
-        {activeTab === 'routes' && <div style={{ padding: 20, overflowY: 'auto' }}><RoutesManager /></div>}
-        {activeTab === 'buses' && <div style={{ padding: 20, overflowY: 'auto' }}><BusManager /></div>}
-        {activeTab === 'drivers' && <div style={{ padding: 20, overflowY: 'auto' }}><DriverManager /></div>}
-        {activeTab === 'parents' && <div style={{ padding: 20, overflowY: 'auto' }}><ParentManager /></div>}
+        {/* --- ROUTER NỘI DUNG --- */}
+        {/* 3. Hiển thị nội dung Trạm */}
+        {activeTab === 'stops' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><StopManager /></div>}
+
+        {activeTab === 'schedule_create' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><ScheduleManager /></div>}
+        {activeTab === 'notifications' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><NotificationManager /></div>}
+        {activeTab === 'routes' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><RoutesManager /></div>}
+        {activeTab === 'students' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><StudentManager /></div>}
+        {activeTab === 'buses' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><BusManager /></div>}
+        {activeTab === 'drivers' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><DriverManager /></div>}
+        {activeTab === 'parents' && <div style={{ padding: 20, overflowY: 'auto', height: 'calc(100vh - 80px)' }}><ParentManager /></div>}
 
         {activeTab === 'dashboard' && (
           <>
@@ -155,8 +194,7 @@ function App() {
                       <thead><tr><th>Tuyến</th><th>Biển số</th><th>TT</th></tr></thead>
                       <tbody>{schedules.map(item => (
                         <tr key={item.schedule_id} className={selectedTrip === item.schedule_id ? 'selected' : ''} onClick={() => setSelectedTrip(item.schedule_id)}>
-                          <td>{item.route_name}</td><td>{item.license_plate}</td>
-                          <td><span className={`badge ${item.status}`}>{item.status}</span></td>
+                          <td>{item.route_name}</td><td>{item.license_plate}</td><td><span className={`badge ${item.status}`}>{item.status}</span></td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -166,15 +204,14 @@ function App() {
               
               <div className="map-panel">
                 {selectedTrip ? (
-                   // --- ĐOẠN FIX LỖI Ở ĐÂY ---
                    (() => {
-                      // Tìm thông tin chuyến xe để lấy route_id
+                      // Tìm thông tin chuyến xe để lấy route_id cho bản đồ vẽ lộ trình
                       const tripInfo = schedules.find(s => s.schedule_id === selectedTrip);
                       return (
                          <MapTracking 
                             key={selectedTrip} 
                             scheduleId={selectedTrip} 
-                            routeId={tripInfo?.route_id} // Truyền thêm routeId để vẽ trạm
+                            routeId={tripInfo?.route_id} 
                          />
                       );
                    })()
