@@ -27,6 +27,6 @@ async function deleteBus(id) {
 module.exports = { 
     getAllBuses, 
     createBus,
-     updateBus, 
+    updateBus, 
     deleteBus 
 };

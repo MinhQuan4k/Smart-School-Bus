@@ -5,7 +5,7 @@ const { verifyToken, isAdmin } = require("../middlewares/auth.middleware");
 // GET /api/schedules (Xem lịch)
 router.get("/", scheduleController.list);
 
-// POST /api/schedules (Tạo lịch)
+// POST /api/schedules (Tạo lịch)   
 router.post("/", scheduleController.create);
 router.post("/", verifyToken, isAdmin, scheduleController.create);
 router.get("/driver/me", verifyToken, scheduleController.getMySchedules);

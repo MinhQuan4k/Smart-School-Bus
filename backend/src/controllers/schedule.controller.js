@@ -39,7 +39,7 @@ exports.getMySchedules = async (req, res, next) => {
     }
 };
 
-// --- HÀM MỚI THÊM (Lấy danh sách học sinh) ---
+// ---Lấy danh sách học sinh ---
 exports.getScheduleStudents = async (req, res, next) => {
     try {
         const { id } = req.params; // schedule_id
